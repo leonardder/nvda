@@ -319,14 +319,15 @@ formatConfigFlagsMap={
 	"reportTables":0x200,
 	"reportLists":0x400,
 	"reportLinks":0x800,
-	"reportComments":0x1000,
-	"reportHeadings":0x2000,
-	"autoLanguageSwitching":0x4000,
-	"reportRevisions":0x8000,
-	"reportParagraphIndentation":0x10000,
+	"reportGraphics":0x1000,
+	"reportComments":0x2000,
+	"reportHeadings":0x4000,
+	"autoLanguageSwitching":0x8000,
+	"reportRevisions":0x10000,
+	"reportParagraphIndentation":0x20000,
 	"reportLineSpacing":0x40000,
 }
-formatConfigFlag_includeLayoutTables=0x20000
+formatConfigFlag_includeLayoutTables=0x80000
 
 # Map some characters from PUA to Unicode. Meant to be used with bullets only.
 # Doesn't care about the actual font, so can give incorrect Unicode in rare cases.

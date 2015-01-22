@@ -1656,6 +1656,12 @@ def getFormatFieldSpeech(attrs,attrsCache=None,formatConfig=None,reason=None,uni
 		if (link or oldLink is not None) and link!=oldLink:
 			text=_("link") if link else _("out of %s")%_("link")
 			textList.append(text)
+	if  formatConfig["reportGraphics"]:
+		graphic=attrs.get("graphic")
+		oldGraphic=attrsCache.get("graphic") if attrsCache is not None else None
+		if (graphic or oldGraphic is not None) and graphic!=oldGraphic:
+			text=_("graphic") if graphic else _("out of %s")%_("graphic")
+			textList.append(text)
 	if  formatConfig["reportComments"]:
 		comment=attrs.get("comment")
 		oldComment=attrsCache.get("comment") if attrsCache is not None else None
