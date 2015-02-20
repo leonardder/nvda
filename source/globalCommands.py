@@ -1869,6 +1869,20 @@ class GlobalCommands(ScriptableObject):
 	script_activateConfigProfilesDialog.__doc__ = _("Shows the NVDA Configuration Profiles dialog")
 	script_activateConfigProfilesDialog.category=SCRCAT_CONFIG
 
+	def script_toggleConfigProfileTriggers(self,gesture):
+		if config.conf.profileTriggersEnabled:
+			# Translators: The message announced when temporarily disabling all configuration profile triggers.
+			state = _("Configuration profile triggers disabled")
+			config.conf.profileTriggersEnabled=False
+		else:
+			# Translators: The message announced when re-enabling all configuration profile triggers.
+			state = _("Configuration profile triggers enabled")
+			config.conf.profileTriggersEnabled=True
+		ui.message(state)
+	# Translators: Input help mode message for toggle configuration profile triggers command.
+	script_toggleConfigProfileTriggers.__doc__=_("Disables or enables all configuration profile triggers, where disabling is on a temporary basis")
+	script_toggleConfigProfileTriggers.category=SCRCAT_CONFIG
+
 	def script_interactWithMath(self, gesture):
 		import mathPres
 		mathMl = mathPres.getMathMlFromTextInfo(api.getReviewPosition())
