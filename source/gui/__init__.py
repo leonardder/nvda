@@ -388,7 +388,7 @@ class SysTrayIcon(wx.TaskBarIcon):
 			self.Bind(wx.EVT_MENU, frame.onAddonsManagerCommand, item)
 		if not globalVars.appArgs.secure and getattr(sys,'frozen',None):
 			# Translators: The label for the menu item to create a portable copy of NVDA from an installed or another portable version.
-			item = menu_tools.Append(wx.ID_ANY, _("Create Portable copy..."))
+			item = menu_tools.Append(wx.ID_ANY, _("Create portable copy..."))
 			self.Bind(wx.EVT_MENU, frame.onCreatePortableCopyCommand, item)
 			if not config.isInstalledCopy():
 				# Translators: The label for the menu item to install NVDA on the computer.
@@ -405,7 +405,7 @@ class SysTrayIcon(wx.TaskBarIcon):
 			# Translators: The label of a menu item to open NVDA user guide.
 			item = menu_help.Append(wx.ID_ANY, _("&User Guide"))
 			self.Bind(wx.EVT_MENU, lambda evt: os.startfile(getDocFilePath("userGuide.html")), item)
-			# Translators: The label of a menu item to open the Commands Quick Reference document.
+			# Translators: The label of a menu item to open the Commands quick reference document.
 			item = menu_help.Append(wx.ID_ANY, _("Commands &Quick Reference"))
 			self.Bind(wx.EVT_MENU, lambda evt: os.startfile(getDocFilePath("keyCommands.html")), item)
 			# Translators: The label for the menu item to open What's New document.
