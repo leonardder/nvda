@@ -284,17 +284,28 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 		setattr(cls, funcName, script)
 		cls.__gestures["kb:shift+%s" % key] = scriptName
 
-	def script_elementsList(self,gesture):
+	def script_elementsList(self,gesture, itemType=None):
 		# We need this to be a modal dialog, but it mustn't block this script.
 		def run():
 			gui.mainFrame.prePopup()
-			d = self.ElementsListDialog(self)
+			d = self.ElementsListDialog(self,itemType)
 			d.ShowModal()
 			d.Destroy()
 			gui.mainFrame.postPopup()
 		wx.CallAfter(run)
 	# Translators: the description for the Elements List command in browse mode.
 	script_elementsList.__doc__ = _("Lists various types of elements in this document")
+
+	@classmethod
+	def addElementsListQuickNav(cls, itemType, key, doc, error):
+		scriptSuffix = itemType[0].upper() + itemType[1:]
+		scriptName = "ElementsList%s" % scriptSuffix
+		funcName = "script_%s" % scriptName
+		script = lambda self,gesture: self.script_elementsList(gesture, itemType)
+		script.__doc__ = doc
+		script.__name__ = funcName
+		setattr(cls, funcName, script)
+		cls.__gestures["kb:%s" % key] = scriptName
 
 	def _activatePosition(self):
 		raise NotImplementedError
@@ -314,6 +325,7 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 
 # Add quick navigation scripts.
 qn = BrowseModeTreeInterceptor.addQuickNav
+elqn = BrowseModeTreeInterceptor.addElementsListQuickNav
 qn("heading", key="h",
 	# Translators: Input help message for a quick navigation command in browse mode.
 	nextDoc=_("moves to the next heading"),
@@ -323,6 +335,11 @@ qn("heading", key="h",
 	prevDoc=_("moves to the previous heading"),
 	# Translators: Message presented when the browse mode element is not found.
 	prevError=_("no previous heading"))
+elqn("heading", key="alt+NVDA+h",
+	# Translators: Input help message for a elements list quick navigation command in browse mode.
+	doc=_("Shows the elements list with a list of headings in this document"),
+	# Translators: Message presented when the browse mode element is not found.
+	error=_("no headings in this document"))
 qn("heading1", key="1",
 	# Translators: Input help message for a quick navigation command in browse mode.
 	nextDoc=_("moves to the next heading at level 1"),
@@ -586,8 +603,14 @@ class ElementsListDialog(wx.Dialog):
 
 	lastSelectedElementType=0
 
-	def __init__(self, document):
+	def __init__(self, document, itemType):
 		self.document = document
+		if itemType:
+			try:
+				self.lastSelectedElementType= tuple(et[0] for et in self.ELEMENT_TYPES).index(itemType)
+			except ValueError:
+				# Element not available in element list, so default element selected
+				pass
 		# Translators: The title of the browse mode Elements List dialog.
 		super(ElementsListDialog, self).__init__(gui.mainFrame, wx.ID_ANY, _("Elements List"))
 		mainSizer = wx.BoxSizer(wx.VERTICAL)
