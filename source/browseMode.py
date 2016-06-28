@@ -284,7 +284,14 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 		setattr(cls, funcName, script)
 		cls.__gestures["kb:shift+%s" % key] = scriptName
 
-	def script_elementsList(self,gesture, itemType=None):
+	def script_elementsList(self,gesture, itemType=None, errorMessage=None):
+		# First, check whether we have a preset itemType as well as whether elements of this type exist on the page
+		if itemType :
+			try:
+				next(self._iterNodesByType(itemType))
+			except StopIteration:				
+				ui.message(errorMessage)
+				return
 		# We need this to be a modal dialog, but it mustn't block this script.
 		def run():
 			gui.mainFrame.prePopup()
@@ -301,11 +308,12 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 		scriptSuffix = itemType[0].upper() + itemType[1:]
 		scriptName = "ElementsList%s" % scriptSuffix
 		funcName = "script_%s" % scriptName
-		script = lambda self,gesture: self.script_elementsList(gesture, itemType)
+		script = lambda self,gesture: self.script_elementsList(gesture, itemType, error)
 		script.__doc__ = doc
 		script.__name__ = funcName
 		setattr(cls, funcName, script)
-		cls.__gestures["kb:%s" % key] = scriptName
+		if key:
+			cls.__gestures["kb:%s" % key] = scriptName
 
 	def _activatePosition(self):
 		raise NotImplementedError
