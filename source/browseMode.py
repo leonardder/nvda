@@ -289,6 +289,10 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 		if itemType :
 			try:
 				next(self._iterNodesByType(itemType))
+			except NotImplementedError:
+				# Translators: a message when a particular quick nav command is not supported in the current document.
+				ui.message(_("Not supported in this document"))
+				return
 			except StopIteration:				
 				ui.message(errorMessage)
 				return
@@ -421,6 +425,11 @@ qn("link", key="k",
 	prevDoc=_("moves to the previous link"),
 	# Translators: Message presented when the browse mode element is not found.
 	prevError=_("no previous link"))
+elqn("link", key="alt+NVDA+k",
+	# Translators: Input help message for a elements list quick navigation command in browse mode.
+	doc=_("Shows the elements list with a list of links in this document"),
+	# Translators: Message presented when the browse mode element is not found.
+	error=_("no links in this document"))
 qn("visitedLink", key="v",
 	# Translators: Input help message for a quick navigation command in browse mode.
 	nextDoc=_("moves to the next visited link"),
@@ -477,6 +486,11 @@ qn("button", key="b",
 	prevDoc=_("moves to the previous button"),
 	# Translators: Message presented when the browse mode element is not found.
 	prevError=_("no previous button"))
+elqn("button", key="alt+NVDA+b",
+	# Translators: Input help message for a elements list quick navigation command in browse mode.
+	doc=_("Shows the elements list with a list of buttons in this document"),
+	# Translators: Message presented when the browse mode element is not found.
+	error=_("no buttons in this document"))
 qn("edit", key="e",
 	# Translators: Input help message for a quick navigation command in browse mode.
 	nextDoc=_("moves to the next edit field"),
@@ -571,6 +585,11 @@ qn("landmark", key="d",
 	# Translators: Message presented when the browse mode element is not found.
 	prevError=_("no previous landmark"),
 	readUnit=textInfos.UNIT_LINE)
+elqn("landmark", key="alt+NVDA+d",
+	# Translators: Input help message for a elements list quick navigation command in browse mode.
+	doc=_("Shows the elements list with a list of landmarks in this document"),
+	# Translators: Message presented when the browse mode element is not found.
+	error=_("no landmarks in this document"))
 qn("embeddedObject", key="o",
 	# Translators: Input help message for a quick navigation command in browse mode.
 	nextDoc=_("moves to the next embedded object"),
@@ -589,7 +608,13 @@ qn("annotation", key="a",
 	prevDoc=_("moves to the previous annotation"),
 	# Translators: Message presented when the browse mode element is not found.
 	prevError=_("no previous annotation"))
+elqn("annotation", key="alt+NVDA+a",
+	# Translators: Input help message for a elements list quick navigation command in browse mode.
+	doc=_("Shows the elements list with a list of annotations in this document"),
+	# Translators: Message presented when the browse mode element is not found.
+	error=_("no annotations in this document"))
 del qn
+del elqn
 
 class ElementsListDialog(wx.Dialog):
 	ELEMENT_TYPES = (
@@ -598,10 +623,10 @@ class ElementsListDialog(wx.Dialog):
 		("link", _("Lin&ks")),
 		# Translators: The label of a radio button to select the type of element
 		# in the browse mode Elements List dialog.
-		("button", _("&Buttons")),
+		("heading", _("&Headings")),
 		# Translators: The label of a radio button to select the type of element
 		# in the browse mode Elements List dialog.
-		("heading", _("&Headings")),
+		("button", _("&Buttons")),
 		# Translators: The label of a radio button to select the type of element
 		# in the browse mode Elements List dialog.
 		("landmark", _("Lan&dmarks")),
