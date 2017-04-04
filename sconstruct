@@ -88,7 +88,7 @@ env.AddMethod(recursiveCopy)
 #Check for any unknown variables
 unknown=vars.UnknownVariables().keys()
 if len(unknown)>0:
-	print "Unknown commandline variables: %s"%unknown
+	print("Unknown commandline variables: %s"%unknown)
 	Exit(1)
 
 #Ensure that any Python subprocesses (such as for py2exe) can find our Python directory in miscDeps
@@ -128,7 +128,7 @@ if certPassword:
 if certTimestampServer:
 	signExecCmd.extend(("/t", certTimestampServer))
 def signExec(target,source,env):
-	print [str(x) for x in target]
+	print([str(x) for x in target])
 	#sys.exit(1)
 	# #3795: signtool can quite commonly fail with timestamping, so allow it to try up to 3 times with a 1 second delay between each try. 
 	res=0
