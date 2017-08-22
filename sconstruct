@@ -184,8 +184,8 @@ env64.SConscript('nvdaHelper/archBuild_sconscript',exports={'env':env64,'clientI
 #envWin10.SConscript('nvdaHelper/localWin10/sconscript', exports={'env': envWin10, 'libInstallDir': sourceLibDir}, variant_dir='build/x86/localWin10')
 
 #Allow all NVDA's gettext po files to be compiled in source/locale
-for po in env.Glob(sourceDir.path+'/locale/*/lc_messages/*.po'):
-	env.gettextMoFile(po)
+#for po in env.Glob(sourceDir.path+'/locale/*/lc_messages/*.po'):
+#	env.gettextMoFile(po)
 
 #Allow all key command t2t files to be generated from their userGuide t2t sources
 for lang in os.listdir(userDocsDir.path):
