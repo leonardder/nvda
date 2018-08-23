@@ -526,6 +526,10 @@ void generateXMLAttribsForFormatting(IDispatch* pDispatchRange, int startOffset,
 			BSTR listString=NULL;
 			if(_com_dispatch_raw_propget(pDispatchListFormat,wdDISPID_LISTFORMAT_LISTSTRING,VT_BSTR,&listString)==S_OK&&listString) {
 				if(SysStringLen(listString)>0) {
+					long listLevel=0;
+					if(_com_dispatch_raw_propget(pDispatchListFormat,wdDISPID_LISTFORMAT_LISTLEVELNUMBER,VT_I4,&listLevel)==S_OK) {
+						formatAttribsStream<<L"list-level=\""<<listLevel<<L"\" ";
+					}
 					IDispatchPtr pDispatchParagraphs=NULL;
 					IDispatchPtr pDispatchParagraph=NULL;
 					IDispatchPtr pDispatchParagraphRange=NULL;
@@ -540,10 +544,6 @@ void generateXMLAttribsForFormatting(IDispatch* pDispatchRange, int startOffset,
 							appendCharToXML(listString[i],tempText,true);
 						}
 						formatAttribsStream<<L"line-prefix=\""<<tempText<<L"\" ";
-						long listLevel = -1;
-						if(_com_dispatch_raw_propget(pDispatchListFormat,wdDISPID_LISTFORMAT_LISTLEVELNUMBER,VT_I4,&listLevel)==S_OK) {
-							formatAttribsStream<<L"list-level=\""<<listLevel<<L"\" ";
-						}
 					}
 				}
 				SysFreeString(listString);
