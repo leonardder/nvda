@@ -816,6 +816,24 @@ Tries to force this object to take the focus.
 		"""
 		raise NotImplementedError
 
+	def _get_controllerFor(self):
+		"""The objects for which this object is the controller
+		(e.g. the objects manipulated by this object or aria-controls).
+		@return: The objects controlled by this object.
+		@rtype: [L{NVDAObject}]
+		@raise NotImplementedError: If not supported by the underlying object.
+		"""
+		raise NotImplementedError
+
+	def _get_controlledBy(self):
+		"""The objects this object is controlled by
+		(e.g. the objects that have aria-controls set to this object).
+		@return: The objects this object is controlled by.
+		@rtype: [L{NVDAObject}]
+		@raise NotImplementedError: If not supported by the underlying object.
+		"""
+		raise NotImplementedError
+
 	def _get_isPresentableFocusAncestor(self):
 		"""Determine if this object should be presented to the user in the focus ancestry.
 		@return: C{True} if it should be presented in the focus ancestry, C{False} if not.

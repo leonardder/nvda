@@ -1372,7 +1372,6 @@ the NVDAObject for IAccessible
 		if not isinstance(self.IAccessibleObject, IAccessibleHandler.IAccessible2):
 			raise NotImplementedError
 		import ctypes
-		import comtypes.hresult
 		try:
 			size = self.IAccessibleObject.nRelations
 		except COMError:
@@ -1383,9 +1382,34 @@ the NVDAObject for IAccessible
 		count = ctypes.c_int()
 		# The client allocated relations array is an [out] parameter instead of [in, out], so we need to use the raw COM method.
 		res = self.IAccessibleObject._IAccessible2__com__get_relations(size, relations, ctypes.byref(count))
-		if res != comtypes.hresult.S_OK:
+		if res != S_OK:
 			raise NotImplementedError
 		return list(relations)
+
+	def _getIA2RelationTargets(self, relationType):
+		import ctypes
+		from comtypes import IUnknown
+		for relation in self._IA2Relations:
+			try:
+				if relation.relationType != relationType:
+					continue
+				size = relation.nTargets
+				if size <= 0:
+					break
+				# The targets are normalized later in the process
+				targets = (ctypes.POINTER(IUnknown) * size)()
+				count = ctypes.c_int()
+				# The client allocated targets array is an [out] parameter instead of [in, out], so we need to use the raw COM method.
+				res = relation._IAccessibleRelation__com__get_targets(size, targets, ctypes.byref(count))
+				if res != S_OK:
+					break
+				return list(
+					IAccessible(IAccessibleObject=IAccessibleHandler.normalizeIAccessible(target), IAccessibleChildID=0)
+					for target in targets
+				)
+			except COMError:
+				continue
+		return []
 
 	def _getIA2RelationFirstTarget(self, relationType):
 		for relation in self._IA2Relations:
@@ -1401,6 +1425,12 @@ the NVDAObject for IAccessible
 
 	def _get_flowsFrom(self):
 		return self._getIA2RelationFirstTarget(IAccessibleHandler.IA2_RELATION_FLOWS_FROM)
+
+	def _get_controlledBy(self):
+		return self._getIA2RelationTargets(IAccessibleHandler.IA2_RELATION_CONTROLLED_BY)
+
+	def _get_controllerFor(self):
+		return self._getIA2RelationTargets(IAccessibleHandler.IA2_RELATION_CONTROLLER_FOR)
 
 	def event_valueChange(self):
 		if isinstance(self, EditableTextWithAutoSelectDetection):
