@@ -40,15 +40,15 @@ class Offsets(object):
  
 def findStartOfLine(text,offset,lineLength=None):
 	"""Searches backwards through the given text from the given offset, until it finds the offset that is the start of the line. With out a set line length, it searches for new line / cariage return characters, with a set line length it simply moves back to sit on a multiple of the line length.
-@param text: the text to search
-@type text: string
-@param offset: the offset of the text to start at
-@type offset: int
-@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
-@type lineLength: int or None
-@return: the found offset
-@rtype: int 
-"""
+	@param text: the text to search
+	@type text: string
+	@param offset: the offset of the text to start at
+	@type offset: int
+	@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
+	@type lineLength: int or None
+	@return: the found offset
+	@rtype: int 
+	"""
 	if not text:
 		return 0
 	if offset>=len(text):
@@ -66,15 +66,15 @@ def findStartOfLine(text,offset,lineLength=None):
 
 def findEndOfLine(text,offset,lineLength=None):
 	"""Searches forwards through the given text from the given offset, until it finds the offset that is the start of the next line. With out a set line length, it searches for new line / cariage return characters, with a set line length it simply moves forward to sit on a multiple of the line length.
-@param text: the text to search
-@type text: unicode
-@param offset: the offset of the text to start at
-@type offset: int
-@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
-@type lineLength: int or None
-@return: the found offset
-@rtype: int 
-"""
+	@param text: the text to search
+	@type text: unicode
+	@param offset: the offset of the text to start at
+	@type offset: int
+	@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
+	@type lineLength: int or None
+	@return: the found offset
+	@rtype: int 
+	"""
 	if not text:
 		return 0
 	if offset>=len(text):
@@ -93,15 +93,15 @@ def findEndOfLine(text,offset,lineLength=None):
 
 def findStartOfWord(text,offset,lineLength=None):
 	"""Searches backwards through the given text from the given offset, until it finds the offset that is the start of the word. It checks to see if a character is alphanumeric, or is another symbol , or is white space.
-@param text: the text to search
-@type text: unicode
-@param offset: the offset of the text to start at
-@type offset: int
-@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
-@type lineLength: int or None
-@return: the found offset
-@rtype: int 
-"""
+	@param text: the text to search
+	@type text: unicode
+	@param offset: the offset of the text to start at
+	@type offset: int
+	@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
+	@type lineLength: int or None
+	@return: the found offset
+	@rtype: int 
+	"""
 	if offset>=len(text):
 		return offset
 	while offset>0 and text[offset].isspace():
@@ -115,15 +115,15 @@ def findStartOfWord(text,offset,lineLength=None):
 
 def findEndOfWord(text,offset,lineLength=None):
 	"""Searches forwards through the given text from the given offset, until it finds the offset that is the start of the next word. It checks to see if a character is alphanumeric, or is another symbol , or is white space.
-@param text: the text to search
-@type text: unicode
-@param offset: the offset of the text to start at
-@type offset: int
-@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
-@type lineLength: int or None
-@return: the found offset
-@rtype: int 
-"""
+	@param text: the text to search
+	@type text: unicode
+	@param offset: the offset of the text to start at
+	@type offset: int
+	@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
+	@type lineLength: int or None
+	@return: the found offset
+	@rtype: int 
+	"""
 	if offset>=len(text):
 		return offset+1
 	if unicodedata.category(text[offset])[0] in "LMN":
