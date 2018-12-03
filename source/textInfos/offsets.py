@@ -38,103 +38,6 @@ class Offsets(object):
 	def __ne__(self,other):
 		return not self==other
 
-def findStartOfLine(text,offset,lineLength=None):
-	"""Searches backwards through the given text from the given offset, until it finds the offset that is the start of the line. With out a set line length, it searches for new line / cariage return characters, with a set line length it simply moves back to sit on a multiple of the line length.
-	@param text: the text to search
-	@type text: string
-	@param offset: the offset of the text to start at
-	@type offset: int
-	@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
-	@type lineLength: int or None
-	@return: the found offset
-	@rtype: int 
-	"""
-	if not text:
-		return 0
-	if offset>=len(text):
-		offset=len(text)-1
-	if isinstance(lineLength,int):
-		return offset-(offset%lineLength)
-	if text[offset]=='\n' and offset>=0 and text[offset-1]=='\r':
-		offset-=1
-	start=text.rfind('\n',0,offset)
-	if start<0:
-		start=text.rfind('\r',0,offset)
-	if start<0:
-		start=-1
-	return start+1
-
-def findEndOfLine(text,offset,lineLength=None):
-	"""Searches forwards through the given text from the given offset, until it finds the offset that is the start of the next line. With out a set line length, it searches for new line / cariage return characters, with a set line length it simply moves forward to sit on a multiple of the line length.
-	@param text: the text to search
-	@type text: unicode
-	@param offset: the offset of the text to start at
-	@type offset: int
-	@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
-	@type lineLength: int or None
-	@return: the found offset
-	@rtype: int 
-	"""
-	if not text:
-		return 0
-	if offset>=len(text):
-		offset=len(text)-1
-	if isinstance(lineLength,int):
-		return (offset-(offset%lineLength)+lineLength)
-	end=offset
-	if text[end]!='\n':
-		end=text.find('\n',offset)
-	if end<0:
-		if text[offset]!='\r':
-			end=text.find('\r',offset)
-	if end<0:
-		end=len(text)-1
-	return end+1
-
-def findStartOfWord(text,offset,lineLength=None):
-	"""Searches backwards through the given text from the given offset, until it finds the offset that is the start of the word. It checks to see if a character is alphanumeric, or is another symbol , or is white space.
-	@param text: the text to search
-	@type text: unicode
-	@param offset: the offset of the text to start at
-	@type offset: int
-	@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
-	@type lineLength: int or None
-	@return: the found offset
-	@rtype: int 
-	"""
-	if offset>=len(text):
-		return offset
-	while offset>0 and text[offset].isspace():
-		offset-=1
-	if unicodedata.category(text[offset])[0] not in "LMN":
-		return offset
-	else:
-		while offset>0 and unicodedata.category(text[offset-1])[0] in "LMN":
-			offset-=1
-	return offset
-
-def findEndOfWord(text,offset,lineLength=None):
-	"""Searches forwards through the given text from the given offset, until it finds the offset that is the start of the next word. It checks to see if a character is alphanumeric, or is another symbol , or is white space.
-	@param text: the text to search
-	@type text: unicode
-	@param offset: the offset of the text to start at
-	@type offset: int
-	@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
-	@type lineLength: int or None
-	@return: the found offset
-	@rtype: int 
-	"""
-	if offset>=len(text):
-		return offset+1
-	if unicodedata.category(text[offset])[0] in "LMN":
-		while offset<len(text) and unicodedata.category(text[offset])[0] in "LMN":
-			offset+=1
-	elif unicodedata.category(text[offset])[0] not in "LMNZ":
-		offset+=1
-	while offset<len(text) and text[offset].isspace():
-		offset+=1
-	return offset
-
 class OffsetsTextInfo(textInfos.TextInfo):
 	"""An abstract TextInfo for text implementations which represent ranges using numeric offsets relative to the start of the text.
 	In such implementations, the start of the text is represented by 0 and the end is the length of the entire text.
@@ -297,8 +200,8 @@ class OffsetsTextInfo(textInfos.TextInfo):
 			if NVDAHelper.localLib.calculateWordOffsets(lineText,len(lineText),offset-lineStart,ctypes.byref(start),ctypes.byref(end)):
 				return start.value+lineStart,min(end.value+lineStart,lineEnd)
 		#Fall back to the older word offsets detection that only breaks on non alphanumeric
-		start=findStartOfWord(lineText,offset-lineStart)+lineStart
-		end=findEndOfWord(lineText,offset-lineStart)+lineStart
+		start=self.findStartOfWord(lineText,offset-lineStart)+lineStart
+		end=self.findEndOfWord(lineText,offset-lineStart)+lineStart
 		return [start,end]
 
 	def _getLineNumFromOffset(self,offset):
@@ -307,8 +210,8 @@ class OffsetsTextInfo(textInfos.TextInfo):
 
 	def _getLineOffsets(self,offset):
 		text=self._getStoryText()
-		start=findStartOfLine(text,offset)
-		end=findEndOfLine(text,offset)
+		start=self.findStartOfLine(text,offset)
+		end=self.findEndOfLine(text,offset)
 		return [start,end]
 
 	def _getParagraphOffsets(self,offset):
@@ -558,10 +461,108 @@ class OffsetsTextInfo(textInfos.TextInfo):
 	def _get_bookmark(self):
 		return Offsets(self._startOffset,self._endOffset)
 
+	def findStartOfLine(self, text, offset, lineLength=None):
+		"""Searches backwards through the given text from the given offset, until it finds the offset that is the start of the line. With out a set line length, it searches for new line / cariage return characters, with a set line length it simply moves back to sit on a multiple of the line length.
+		@param text: the text to search
+		@type text: string
+		@param offset: the offset of the text to start at
+		@type offset: int
+		@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
+		@type lineLength: int or None
+		@return: the found offset
+		@rtype: int 
+		"""
+		if not text:
+			return 0
+		if offset>=len(text):
+			offset=len(text)-1
+		if isinstance(lineLength,int):
+			return offset-(offset%lineLength)
+		if text[offset]=='\n' and offset>=0 and text[offset-1]=='\r':
+			offset-=1
+		start=text.rfind('\n',0,offset)
+		if start<0:
+			start=text.rfind('\r',0,offset)
+		if start<0:
+			start=-1
+		return start+1
+
+	def findEndOfLine(self, text, offset, lineLength=None):
+		"""Searches forwards through the given text from the given offset, until it finds the offset that is the start of the next line. With out a set line length, it searches for new line / cariage return characters, with a set line length it simply moves forward to sit on a multiple of the line length.
+		@param text: the text to search
+		@type text: unicode
+		@param offset: the offset of the text to start at
+		@type offset: int
+		@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
+		@type lineLength: int or None
+		@return: the found offset
+		@rtype: int 
+		"""
+		if not text:
+			return 0
+		if offset>=len(text):
+			offset=len(text)-1
+		if isinstance(lineLength,int):
+			return (offset-(offset%lineLength)+lineLength)
+		end=offset
+		if text[end]!='\n':
+			end=text.find('\n',offset)
+		if end<0:
+			if text[offset]!='\r':
+				end=text.find('\r',offset)
+		if end<0:
+			end=len(text)-1
+		return end+1
+
+	def findStartOfWord(self, text, offset, lineLength=None):
+		"""Searches backwards through the given text from the given offset, until it finds the offset that is the start of the word. It checks to see if a character is alphanumeric, or is another symbol , or is white space.
+		@param text: the text to search
+		@type text: unicode
+		@param offset: the offset of the text to start at
+		@type offset: int
+		@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
+		@type lineLength: int or None
+		@return: the found offset
+		@rtype: int 
+		"""
+		if offset>=len(text):
+			return offset
+		while offset>0 and text[offset].isspace():
+			offset-=1
+		if unicodedata.category(text[offset])[0] not in "LMN":
+			return offset
+		else:
+			while offset>0 and unicodedata.category(text[offset-1])[0] in "LMN":
+				offset-=1
+		return offset
+
+	def findEndOfWord(self, text, offset, lineLength=None):
+		"""Searches forwards through the given text from the given offset, until it finds the offset that is the start of the next word. It checks to see if a character is alphanumeric, or is another symbol , or is white space.
+		@param text: the text to search
+		@type text: unicode
+		@param offset: the offset of the text to start at
+		@type offset: int
+		@param lineLength: The number of characters that makes up a line, None if new line characters should be looked at instead
+		@type lineLength: int or None
+		@return: the found offset
+		@rtype: int 
+		"""
+		if offset>=len(text):
+			return offset+1
+		if unicodedata.category(text[offset])[0] in "LMN":
+			while offset<len(text) and unicodedata.category(text[offset])[0] in "LMN":
+				offset+=1
+		elif unicodedata.category(text[offset])[0] not in "LMNZ":
+			offset+=1
+		while offset<len(text) and text[offset].isspace():
+			offset+=1
+		return offset
+
 	def _get_bytesPerCodePoint(self):
 		"""Gets the number of bytes associated with one code point in text encoded with L{internalTextEncoding}."""
 		if not self.internalTextEncoding:
 			raise NotImplementedError("No internal text encoding defined")
 		# Just encode a space and return the length of the encoded result.
+		# Also save the result, as it is not subject to change during an instances lifetime.
 		self.bytesPerCodePoint = len(u" ".encode(self.internalTextEncoding))
 		return self.bytesPerCodePoint
