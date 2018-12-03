@@ -163,6 +163,14 @@ class OffsetsTextInfo(textInfos.TextInfo):
 		return formatField,(startOffset,endOffset)
 
 	def _getCharacterOffsets(self,offset):
+		if self.useUniscribe:
+			tempStart = max(offset - 4, 0)
+			tempEnd = offset + 4
+			start=ctypes.c_int()
+			end=ctypes.c_int()
+			text = self._getTextRange(tempStart, tempEnd)
+			if NVDAHelper.localLib.calculateCharacterOffsets(text,len(text),offset-tempStart,ctypes.byref(start),ctypes.byref(end)):
+				return start.value+tempStart,end.value+tempStart
 		# Windows Unicode is UTF-16, so a character may be two offsets for code points beyond 16 bits.
 		if offset > 0:
 			chars = self._getTextRange(offset - 1, offset + 2)
