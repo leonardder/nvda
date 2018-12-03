@@ -37,7 +37,7 @@ class Offsets(object):
 
 	def __ne__(self,other):
 		return not self==other
- 
+
 def findStartOfLine(text,offset,lineLength=None):
 	"""Searches backwards through the given text from the given offset, until it finds the offset that is the start of the line. With out a set line length, it searches for new line / cariage return characters, with a set line length it simply moves back to sit on a multiple of the line length.
 	@param text: the text to search
@@ -140,11 +140,16 @@ class OffsetsTextInfo(textInfos.TextInfo):
 	In such implementations, the start of the text is represented by 0 and the end is the length of the entire text.
 	
 	All subclasses must implement L{_getStoryLength}.
+	Subclasses where the offsets are tied to a specific encoding should define L{internalTextEncoding}.
+	Note that you should specify an encoding without BOM.
+	They should also set L{textSourceIsEncoded} to C{True} if the text enters NVDA in encoded form.
+	
 	Aside from this, there are two possible implementations:
-		* If the underlying text implementation does not support retrieval of line offsets, L{_getStoryText} should be implemented.
+		1. If the underlying text implementation does not support retrieval of line offsets and L{textSourceIsEncoded} is C{False}, L{_getStoryText} should be implemented.
+		If L{textSourceIsEncoded} is C{True}, L{_getEncodedStoryText} should be implemented.
 		In this case, the base implementation of L{_getLineOffsets} will retrieve the entire text of the object and use text searching algorithms to find line offsets.
 		This is very inefficient and should be avoided if possible.
-		* Otherwise, subclasses must implement at least L{_getTextRange} and L{_getLineOffsets}.
+		2. Otherwise, subclasses must implement at least L{_getTextRange} and L{_getLineOffsets}.
 		Retrieval of other offsets (e.g. L{_getWordOffsets}) should also be implemented if possible for greatest accuracy and efficiency.
 	
 	If a caret and/or selection should be supported, L{_getCaretOffset} and/or L{_getSelectionOffsets} should be implemented, respectively.
@@ -153,7 +158,8 @@ class OffsetsTextInfo(textInfos.TextInfo):
 
 	detectFormattingAfterCursorMaybeSlow=True #: honours documentFormatting config option if true - set to false if this is not at all slow.
 	useUniscribe=True #Use uniscribe to calculate word offsets etc
- 
+	textSourceIsEncoded = False #: Whether the text of this textInfo enters NVDA in encoded form
+	internalTextEncoding = None #: Encoding used to calculate offsets
 
 	def __eq__(self,other):
 		if self is other or (isinstance(other,OffsetsTextInfo) and self._startOffset==other._startOffset and self._endOffset==other._endOffset):
@@ -191,12 +197,38 @@ class OffsetsTextInfo(textInfos.TextInfo):
 	def _getStoryLength(self):
 		raise NotImplementedError
 
+	def _getEncodedStoryText(self):
+		"""Retrieve the entire text of the object in encoded form.
+		The base implementation encodes the return value of L{getStoryText} into L{internalTextEncoding}
+		@return: The entire encoded text of the object.
+		@rtype: bytes
+		"""
+		if self.textSourceIsEncoded:
+			raise NotImplementedError
+		return self._getStoryText().encode(self.internalTextEncoding)
+
 	def _getStoryText(self):
 		"""Retrieve the entire text of the object.
 		@return: The entire text of the object.
 		@rtype: unicode
 		"""
-		raise NotImplementedError
+		if not self.internalTextEncoding or not self.textSourceIsEncoded:
+			raise NotImplementedError
+		return self._getStoryText().decode(self.internalTextEncoding)
+
+	def _getEncodedTextRange(self,start,end):
+		"""Retrieve the encoded text in a given offset range.
+		@param start: The start offset.
+		@type start: int
+		@param end: The end offset (exclusive).
+		@type end: int
+		@return: The text contained in the requested range.
+		@rtype: unicode
+		"""
+		start *= self.bytesPerCodePoint
+		end *= self.bytesPerCodePoint
+		text=self._getEncodedStoryText()
+		return text[start:end] if text else b""
 
 	def _getTextRange(self,start,end):
 		"""Retrieve the text in a given offset range.
@@ -207,6 +239,8 @@ class OffsetsTextInfo(textInfos.TextInfo):
 		@return: The text contained in the requested range.
 		@rtype: unicode
 		"""
+		if self.internalTextEncoding:
+			return self._getEncodedTextRange(start, end).decode(self.internalTextEncoding)
 		text=self._getStoryText()
 		return text[start:end] if text else u""
 
@@ -523,3 +557,11 @@ class OffsetsTextInfo(textInfos.TextInfo):
 
 	def _get_bookmark(self):
 		return Offsets(self._startOffset,self._endOffset)
+
+	def _get_bytesPerCodePoint(self):
+		"""Gets the number of bytes associated with one code point in text encoded with L{internalTextEncoding}."""
+		if not self.internalTextEncoding:
+			raise NotImplementedError("No internal text encoding defined")
+		# Just encode a space and return the length of the encoded result.
+		self.bytesPerCodePoint = len(u" ".encode(self.internalTextEncoding))
+		return self.bytesPerCodePoint
