@@ -64,6 +64,7 @@ class TextRangeStruct(ctypes.Structure):
 	]
 
 class ScintillaTextInfo(textInfos.offsets.OffsetsTextInfo):
+	textSourceIsEncoded = True
 
 	def _getOffsetFromPoint(self,x,y):
 		return watchdog.cancellableSendMessage(self.obj.windowHandle,SCI_POSITIONFROMPOINT,x,y)
@@ -137,11 +138,11 @@ class ScintillaTextInfo(textInfos.offsets.OffsetsTextInfo):
 	def _setSelectionOffsets(self,start,end):
 		watchdog.cancellableSendMessage(self.obj.windowHandle,SCI_SETSEL,start,end)
 
-	def _getStoryText(self):
-		if not hasattr(self,'_storyText'):
+	def _getEncodedStoryText(self):
+		if not hasattr(self,'_encodedStoryText'):
 			storyLength=self._getStoryLength()
-			self._storyText=self._getTextRange(0,storyLength)
-		return self._storyText
+			self._encodedStoryText=self._getEncodedTextRange(0,storyLength)
+		return self._encodedStoryText
 
 	def _getStoryLength(self):
 		if not hasattr(self,'_storyLength'):
@@ -151,7 +152,14 @@ class ScintillaTextInfo(textInfos.offsets.OffsetsTextInfo):
 	def _getLineCount(self):
 		return watchdog.cancellableSendMessage(self.obj.windowHandle,SCI_GETLINECOUNT,0,0)
 
-	def _getTextRange(self,start,end):
+	def _get_internalTextEncoding(self):
+		cp=watchdog.cancellableSendMessage(self.obj.windowHandle,SCI_GETCODEPAGE,0,0)
+		if cp==SC_CP_UTF8:
+			return "utf_8"
+		else:
+			return locale.getlocale()[1]
+
+	def _getEncodedTextRange(self,start,end):
 		bufLen=(end-start)+1
 		textRange=TextRangeStruct()
 		textRange.chrg.cpMin=start
@@ -170,11 +178,7 @@ class ScintillaTextInfo(textInfos.offsets.OffsetsTextInfo):
 			winKernel.readProcessMemory(processHandle,internalBuf,buf,bufLen,None)
 		finally:
 			winKernel.virtualFreeEx(processHandle,internalBuf,0,winKernel.MEM_RELEASE)
-		cp=watchdog.cancellableSendMessage(self.obj.windowHandle,SCI_GETCODEPAGE,0,0)
-		if cp==SC_CP_UTF8:
-			return unicode(buf.value, errors="replace", encoding="utf-8")
-		else:
-			return unicode(buf.value, errors="replace", encoding=locale.getlocale()[1])
+		return buf.value
 
 	def _getWordOffsets(self,offset):
 		start=watchdog.cancellableSendMessage(self.obj.windowHandle,SCI_WORDSTARTPOSITION,offset,0)

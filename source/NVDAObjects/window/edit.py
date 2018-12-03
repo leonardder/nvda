@@ -342,8 +342,16 @@ class EditTextInfo(textInfos.offsets.OffsetsTextInfo):
 	def _getLineCount(self):
 		return self.obj.windowTextLineCount
 
-	def _getTextRange(self,start,end):
-		if self.obj.editAPIVersion>=2:
+	def _get_textSourceIsEncoded(self):
+		self.textSourceIsEncoded = self.obj.editAPIVersion>=2
+		return self.textSourceIsEncoded
+
+	def _get_internalTextEncoding(self):
+		self.internalTextEncoding = "utf_16_le" if self.obj.isWindowUnicode else locale.getlocale()[1]
+		return self.internalTextEncoding
+
+	def _getEncodedTextRange(self,start,end):
+		if self.textSourceIsEncoded:
 			bufLen=((end-start)+1)*2
 			if self.obj.isWindowUnicode:
 				textRange=TextRangeUStruct()
@@ -361,21 +369,26 @@ class EditTextInfo(textInfos.offsets.OffsetsTextInfo):
 					res=watchdog.cancellableSendMessage(self.obj.windowHandle,EM_GETTEXTRANGE,0,internalTextRange)
 				finally:
 					winKernel.virtualFreeEx(processHandle,internalTextRange,0,winKernel.MEM_RELEASE)
-				buf=(ctypes.c_byte*bufLen)()
+				buf=ctypes.create_string_buffer(bufLen)
 				winKernel.readProcessMemory(processHandle,internalBuf,buf,bufLen,None)
 			finally:
 				winKernel.virtualFreeEx(processHandle,internalBuf,0,winKernel.MEM_RELEASE)
-			if self.obj.isWindowUnicode or (res>1 and (buf[res]!=0 or buf[res+1]!=0)): 
-				text=ctypes.cast(buf,ctypes.c_wchar_p).value
+			if (res>1 and (buf[res]!=0 or buf[res+1]!=0)):
+				# Somehow, this ought to be treated as unicode.
+				self.internalTextEncoding = "utf_16_le"
+				text = buf.raw[:res*self.bytesPerOffset]
 			else:
-				text=unicode(ctypes.cast(buf,ctypes.c_char_p).value, errors="replace", encoding=locale.getlocale()[1])
-			# #4095: Some protected richEdit controls do not hide their password characters.
-			# We do this specifically.
-			# Note that protected standard edit controls get characters hidden in _getStoryText.
-			if text and controlTypes.STATE_PROTECTED in self.obj.states:
-				text=u'*'*len(text)
-		else:
-			text=self._getStoryText()[start:end]
+				text = buf.value
+			return text
+		return super(EditTextInfo, self)._getEncodedTextRange(start, end)
+
+	def _getTextRange(self, start, end):
+		text = super(EditTextInfo, self)._getTextRange(start, end)
+		# #4095: Some protected richEdit controls do not hide their password characters.
+		# We do this specifically.
+		# Note that protected standard edit controls (i.e. not textSourceIsEncoded) get characters hidden in _getStoryText.
+		if self.textSourceIsEncoded and text and controlTypes.STATE_PROTECTED in self.obj.states:
+			text=u'*'*len(text)
 		return text
 
 	def _getWordOffsets(self,offset):

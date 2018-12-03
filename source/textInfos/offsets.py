@@ -46,7 +46,7 @@ class OffsetsTextInfo(textInfos.TextInfo):
 	Subclasses where the offsets are tied to a specific encoding should define L{internalTextEncoding}.
 	Note that you should specify an encoding without BOM.
 	They should also set L{textSourceIsEncoded} to C{True} if the text enters NVDA in encoded form.
-	
+
 	Aside from this, there are two possible implementations:
 		1. If the underlying text implementation does not support retrieval of line offsets and L{textSourceIsEncoded} is C{False}, L{_getStoryText} should be implemented.
 		If L{textSourceIsEncoded} is C{True}, L{_getEncodedStoryText} should be implemented.
@@ -54,7 +54,7 @@ class OffsetsTextInfo(textInfos.TextInfo):
 		This is very inefficient and should be avoided if possible.
 		2. Otherwise, subclasses must implement at least L{_getTextRange} and L{_getLineOffsets}.
 		Retrieval of other offsets (e.g. L{_getWordOffsets}) should also be implemented if possible for greatest accuracy and efficiency.
-	
+
 	If a caret and/or selection should be supported, L{_getCaretOffset} and/or L{_getSelectionOffsets} should be implemented, respectively.
 	To support conversion from/to screen points (e.g. for mouse tracking), L{_getOffsetFromPoint}/L{_getPointFromOffset} should be implemented.
 	"""
@@ -62,7 +62,7 @@ class OffsetsTextInfo(textInfos.TextInfo):
 	detectFormattingAfterCursorMaybeSlow=True #: honours documentFormatting config option if true - set to false if this is not at all slow.
 	useUniscribe=True #Use uniscribe to calculate word offsets etc
 	textSourceIsEncoded = False #: Whether the text of this textInfo enters NVDA in encoded form
-	internalTextEncoding = None #: Encoding used to calculate offsets
+	internalTextEncoding = "utf_16_le" #: Encoding used to calculate offsets
 
 	def __eq__(self,other):
 		if self is other or (isinstance(other,OffsetsTextInfo) and self._startOffset==other._startOffset and self._endOffset==other._endOffset):
@@ -106,7 +106,7 @@ class OffsetsTextInfo(textInfos.TextInfo):
 		@return: The entire encoded text of the object.
 		@rtype: bytes
 		"""
-		if self.textSourceIsEncoded:
+		if not self.internalTextEncoding or self.textSourceIsEncoded:
 			raise NotImplementedError
 		return self._getStoryText().encode(self.internalTextEncoding)
 
@@ -117,7 +117,7 @@ class OffsetsTextInfo(textInfos.TextInfo):
 		"""
 		if not self.internalTextEncoding or not self.textSourceIsEncoded:
 			raise NotImplementedError
-		return self._getStoryText().decode(self.internalTextEncoding)
+		return self._getEncodedStoryText().decode(self.internalTextEncoding, errors="replace")
 
 	def _getEncodedTextRange(self,start,end):
 		"""Retrieve the encoded text in a given offset range.
@@ -128,8 +128,8 @@ class OffsetsTextInfo(textInfos.TextInfo):
 		@return: The text contained in the requested range.
 		@rtype: unicode
 		"""
-		start *= self.bytesPerCodePoint
-		end *= self.bytesPerCodePoint
+		start *= self.bytesPerOffset
+		end *= self.bytesPerOffset
 		text=self._getEncodedStoryText()
 		return text[start:end] if text else b""
 
@@ -143,7 +143,7 @@ class OffsetsTextInfo(textInfos.TextInfo):
 		@rtype: unicode
 		"""
 		if self.internalTextEncoding:
-			return self._getEncodedTextRange(start, end).decode(self.internalTextEncoding)
+			return self._getEncodedTextRange(start, end).decode(self.internalTextEncoding, errors="replace")
 		text=self._getStoryText()
 		return text[start:end] if text else u""
 
@@ -168,9 +168,10 @@ class OffsetsTextInfo(textInfos.TextInfo):
 			tempEnd = offset + 4
 			start=ctypes.c_int()
 			end=ctypes.c_int()
-			text = self._getTextRange(tempStart, tempEnd)
+			text = ctypes.create_unicode_buffer(self._getTextRange(tempStart, tempEnd))
+			textLen = len(text)-1 # Subtract the string terminator
 			if NVDAHelper.localLib.calculateCharacterOffsets(text,len(text),offset-tempStart,ctypes.byref(start),ctypes.byref(end)):
-				return start.value+tempStart,end.value+tempStart
+				return start.value+tempStart, end.value+tempStart
 		# Windows Unicode is UTF-16, so a character may be two offsets for code points beyond 16 bits.
 		if offset > 0:
 			chars = self._getTextRange(offset - 1, offset + 2)
@@ -566,11 +567,11 @@ class OffsetsTextInfo(textInfos.TextInfo):
 			offset+=1
 		return offset
 
-	def _get_bytesPerCodePoint(self):
+	def _get_bytesPerOffset(self):
 		"""Gets the number of bytes associated with one code point in text encoded with L{internalTextEncoding}."""
 		if not self.internalTextEncoding:
 			raise NotImplementedError("No internal text encoding defined")
 		# Just encode a space and return the length of the encoded result.
 		# Also save the result, as it is not subject to change during an instances lifetime.
-		self.bytesPerCodePoint = len(u" ".encode(self.internalTextEncoding))
-		return self.bytesPerCodePoint
+		self.bytesPerOffset = len(u" ".encode(self.internalTextEncoding))
+		return self.bytesPerOffset
