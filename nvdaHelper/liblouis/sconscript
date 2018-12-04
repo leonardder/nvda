@@ -1,7 +1,7 @@
 ###
 #This file is a part of the NVDA project.
 #URL: https://www.nvaccess.org/
-#Copyright 2011-2017 NV Access Limited, Joseph Lee
+#Copyright 2011-2018 NV Access Limited, Joseph Lee, Babbage B.V.
 #This program is free software: you can redistribute it and/or modify
 #it under the terms of the GNU General Public License version 2.0, as published by
 #the Free Software Foundation.
@@ -50,6 +50,7 @@ env.Append(CPPDEFINES=[
 	# variants that start with an '_'. This removes those deprecation warnings. */
 	"_CRT_NONSTDC_NO_DEPRECATE",
 	("PACKAGE_VERSION", r'\"%s\"' % getLouisVersion()),
+	# Use UCS-4 (UTF-32) widechars.
 	"WIDECHARS_ARE_UCS4",
 	# Tell liblouis.h that we're exporting liblouis dll functions, not importing them.
 	"_EXPORTING",
