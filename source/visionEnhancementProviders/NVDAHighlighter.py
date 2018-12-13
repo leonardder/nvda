@@ -1,5 +1,4 @@
 #visionEnhancementProviders/NVDAHighlighter.py
-#visionEnhancementProviders/NVDAHighlighter.py
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
@@ -27,6 +26,7 @@ import weakref
 from colors import RGB
 import core
 import driverHandler
+from gui.settingsDialogs import SettingsPanel
 
 class HighlightStyle(
 	namedtuple("HighlightStyle", ("color", "width", "style", "margin"))
@@ -305,3 +305,27 @@ class HighlightWindow(CustomWindow):
 
 	def refresh(self):
 		winUser.user32.InvalidateRect(self.handle, None, True)
+
+class NVDAHighlighterSettingsPanel(SettingsPanel):
+
+	def makeSettings(self, sizer):
+		sHelper = gui.guiHelper.BoxSizerHelper(self, sizer=sizer)
+		# Translators: This is the label for a checkbox in the
+		# default highlighter settings panel to enable highlighting the focus.
+		self.highlightFocusCheckBox=sHelper.addItem(wx.CheckBox(self,label=_("Highlight &focus")))
+		self.highlightFocusCheckBox.SetValue(config.conf['vision'][VisionEnhancementProvider.name]["highlightFocus"])
+		# Translators: This is the label for a checkbox in the
+		# default highlighter settings panel to enable highlighting the navigator object.
+		self.highlightNavigatorObjCheckBox=sHelper.addItem(wx.CheckBox(self,label=_("Highlight &navigator object")))
+		self.highlightNavigatorObjCheckBox.SetValue(config.conf['vision'][VisionEnhancementProvider.name]["highlightNavigatorObj"])
+		# Translators: This is the label for a checkbox in the
+		# default highlighter settings panel to enable highlighting the virtual caret (such as in browse mode).
+		self.highlightBrowseModeCheckBox=sHelper.addItem(wx.CheckBox(self,label=_("Follow &browse mode caret")))
+		self.highlightBrowseModeCheckBox.SetValue(config.conf['vision'][VisionEnhancementProvider.name]["highlightBrowseMode"])
+
+	def onSave(self):
+		config.conf['vision'][VisionEnhancementProvider.name]["highlightFocus"]=self.highlightFocusCheckBox.IsChecked()
+		config.conf['vision'][VisionEnhancementProvider.name]["highlightNavigatorObj"]=self.highlightNavigatorObjCheckBox.IsChecked()
+		config.conf['vision'][VisionEnhancementProvider.name]["highlightBrowseMode"]=self.highlightBrowseModeCheckBox.IsChecked()
+
+VisionEnhancementProvider.guiPanelCls = NVDAHighlighterSettingsPanel
