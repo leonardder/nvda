@@ -26,3 +26,6 @@ def canRunVc2010Builds():
 UWP_OCR_DATA_PATH = os.path.expandvars(r"$windir\OCR")
 def isUwpOcrAvailable():
 	return os.path.isdir(UWP_OCR_DATA_PATH)
+
+def isFullScreenMagnificationAvailable():
+	return (winVersion.major,winVersion.minor) >= (6,2)

@@ -356,7 +356,19 @@ An NVDAObject for a window
 			ret = "exception: %s" % e
 		info.append("windowControlID: %s" % ret)
 		try:
-			ret = repr(self.windowStyle)
+			mask = temp = ctypes.c_ulong(self.windowStyle).value
+			styleConstNames = []
+			for name, const in sorted(winUser.__dict__.iteritems(), key=lambda i: i[1], reverse=True):
+				if (
+					name.startswith("WS_")
+					and not name.startswith("WS_EX_")
+					and mask & const
+				):
+					styleConstNames.append(name)
+					mask &= ~const
+			if mask:
+				styleConstNames.append(hex(mask))
+			ret = ", ".join(styleConstNames) + " (%s)" % hex(temp)
 		except Exception as e:
 			ret = "exception: %s" % e
 		info.append("windowStyle: %s" % ret)
