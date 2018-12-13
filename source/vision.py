@@ -69,6 +69,7 @@ class VisionEnhancementProvider(AutoPropertyObject):
 	conflictingRoles = frozenset()
 	#: A vision enhancement provider is a singleton.
 	_instance = None
+	guiPanelCls = None
 	cachePropertiesByDefault = True
 
 	@classmethod
@@ -293,6 +294,7 @@ class Magnifier(VisionEnhancementProvider):
 	and should implement the L{magnificationLevel} property.
 	Supported contexts should be listed in L{supportedTrackingContexts}.
 	"""
+
 	#: Tuple of supported contexts for this magnifier to track to.
 	supportedTrackingContexts = tuple()
 
@@ -376,7 +378,7 @@ class ColorEnhancer(VisionEnhancementProvider):
 	In this case, the L{transformation} property ought to be implemented
 	to retrieve or change the current transformation.
 	"""
-	
+
 	@abstractmethod
 	def initializeColorEnhancer(self):
 		"""Initializes a color enhancer.

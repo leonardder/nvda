@@ -41,6 +41,7 @@ import characterProcessing
 from baseObject import ScriptableObject
 import core
 import winVersion
+import vision
 
 #: Script category for text review commands.
 # Translators: The name of a category of NVDA commands.
@@ -81,6 +82,9 @@ SCRCAT_INPUT = _("Input")
 #: Script category for document formatting commands.
 # Translators: The name of a category of NVDA commands.
 SCRCAT_DOCUMENTFORMATTING = _("Document formatting")
+#: Script category for vision commands.
+# Translators: The name of a category of NVDA commands.
+SCRCAT_VISION = pgettext('script category', 'Vision')
 
 class GlobalCommands(ScriptableObject):
 	"""Commands that are available at all times, regardless of the current focus.
@@ -2202,6 +2206,35 @@ class GlobalCommands(ScriptableObject):
 	# Translators: Describes a command.
 	script_recognizeWithUwpOcr.__doc__ = _("Recognizes the content of the current navigator object with Windows 10 OCR")
 
+	def script_toggleScreenCurtain(self, gesture):
+		if not winVersion.isFullScreenMagnificationAvailable():
+			# Translators: Reported when the screen curtain is not available.
+			ui.message(_("Screen curtain not available"))
+			return
+		scriptCount=scriptHandler.getLastScriptRepeatCount()
+		screenCurtainName = "screenCurtain"
+		screenCurtainCls = vision.getProviderCls(screenCurtainName)
+		if isinstance(vision.handler.colorEnhancer, screenCurtainCls):
+			vision.handler.setProvider(None, vision.ROLE_COLORENHANCER)
+			ui.message(_("Screen curtain disabled"))
+		elif scriptCount in (0, 2):
+			temporary = scriptCount==0
+			try:
+				vision.handler.setProvider(
+					screenCurtainName,
+					temporary=temporary,
+					# We want to explicitly catch exceptions in case there is a conflict.
+					catchExceptions=False
+				)
+			except:
+				log.debugWarning("Couldn't enable screen curtain", exc_info=True)
+				ui.message(_("Could not enable screen curtain"))
+				return
+			else:
+				ui.message(_("Screen curtain enabled"))
+	# Translators: Describes a command.
+	script_toggleScreenCurtain.__doc__ = _("Toggles the state of the screen curtain, either hiding or viewing the contents of the screen")
+
 	__gestures = {
 		# Basic
 		"kb:NVDA+n": "showGui",
@@ -2386,6 +2419,9 @@ class GlobalCommands(ScriptableObject):
 		"kb(desktop):NVDA+control+f2": "test_navigatorDisplayModelText",
 		"kb:NVDA+alt+m": "interactWithMath",
 		"kb:NVDA+r": "recognizeWithUwpOcr",
+
+		# Vision
+		"kb:NVDA+/": "toggleScreenCurtain",
 	}
 
 #: The single global commands instance.

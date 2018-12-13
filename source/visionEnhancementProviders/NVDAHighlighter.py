@@ -18,6 +18,7 @@ import cursorManager
 from locationHelper import RectLTRB, RectLTWH
 import config
 from collections import namedtuple
+from gui.settingsDialogs import SettingsPanel
 
 # Highlighter specific contexts
 #: Context for overlapping focus and navigator objects
@@ -153,3 +154,26 @@ class HighlightWindow(wx.Frame):
 		self.ShowWithoutActivating()
 		wx.CallAfter(self.Disable)
 
+class NVDAHighlighterSettingsPanel(SettingsPanel):
+
+	def makeSettings(self, sizer):
+		sHelper = gui.guiHelper.BoxSizerHelper(self, sizer=sizer)
+		# Translators: This is the label for a checkbox in the
+		# default highlighter settings panel to enable highlighting the focus.
+		self.highlightFocusCheckBox=sHelper.addItem(wx.CheckBox(self,label=_("Highlight &focus")))
+		self.highlightFocusCheckBox.SetValue(config.conf['vision'][NVDAHighlighter.name]["highlightFocus"])
+		# Translators: This is the label for a checkbox in the
+		# default highlighter settings panel to enable highlighting the navigator object.
+		self.highlightNavigatorObjCheckBox=sHelper.addItem(wx.CheckBox(self,label=_("Highlight &navigator object")))
+		self.highlightNavigatorObjCheckBox.SetValue(config.conf['vision'][NVDAHighlighter.name]["highlightNavigatorObj"])
+		# Translators: This is the label for a checkbox in the
+		# default highlighter settings panel to enable highlighting the virtual caret (such as in browse mode).
+		self.highlightCaretCheckBox=sHelper.addItem(wx.CheckBox(self,label=_("Follow &browse mode caret")))
+		self.highlightCaretCheckBox.SetValue(config.conf['vision'][NVDAHighlighter.name]["highlightCaret"])
+
+	def onSave(self):
+		config.conf['vision'][NVDAHighlighter.name]["highlightFocus"]=self.highlightFocusCheckBox.IsChecked()
+		config.conf['vision'][NVDAHighlighter.name]["highlightNavigatorObj"]=self.highlightNavigatorObjCheckBox.IsChecked()
+		config.conf['vision'][NVDAHighlighter.name]["highlightCaret"]=self.highlightCaretCheckBox.IsChecked()
+
+NVDAHighlighter.guiPanelCls = NVDAHighlighterSettingsPanel
