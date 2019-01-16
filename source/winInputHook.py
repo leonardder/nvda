@@ -62,17 +62,17 @@ hookThreadRefCount=0
 def hookThreadFunc():
 	keyHookID=windll.user32.SetWindowsHookExW(WH_KEYBOARD_LL,keyboardHook,windll.kernel32.GetModuleHandleW(None),0)
 	if keyHookID==0:
-		raise OSError("Could not register keyboard hook")
+		raise OSError("Could not register keyboard hook: %s" % WinError())
 	mouseHookID=windll.user32.SetWindowsHookExW(WH_MOUSE_LL,mouseHook,windll.kernel32.GetModuleHandleW(None),0)
 	if mouseHookID==0:
-		raise OSError("Could not register mouse hook")
+		raise OSError("Could not register mouse hook: %s" % WinError())
 	msg=MSG()
 	while windll.user32.GetMessageW(byref(msg),None,0,0):
 		pass
 	if windll.user32.UnhookWindowsHookEx(keyHookID)==0:
-		raise OSError("could not unregister key hook %s"%keyHookID)
+		raise OSError("could not unregister keyboard hook %s: %s"%(keyHookID,WinError()))
 	if windll.user32.UnhookWindowsHookEx(mouseHookID)==0:
-		raise OSError("could not unregister mouse hook %s"%mouseHookID)
+		raise OSError("could not unregister mouse hook %s: %s"%(mouseHookID,WinError()))
 
 def initialize():
 	global hookThread, hookThreadRefCount
