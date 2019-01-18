@@ -1,4 +1,4 @@
-#vision/screenCurtain.py
+#visionEnhancementProviders/screenCurtain.py
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
@@ -6,7 +6,7 @@
 
 """Screen curtain implementation based on the windows magnification API."""
 
-from . import ColorEnhancer, ColorTransformationInfo, ROLE_MAGNIFIER, ROLE_HIGHLIGHTER
+from vision import ColorEnhancer, ColorTransformationInfo, ROLE_MAGNIFIER, ROLE_HIGHLIGHTER
 import winVersion
 try:
 	import winMagnification
