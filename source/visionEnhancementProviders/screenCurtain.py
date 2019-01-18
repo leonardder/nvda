@@ -26,7 +26,7 @@ TRANSFORM_DEFAULT.transform[2][2] = 1.0
 TRANSFORM_DEFAULT.transform[3][3] = 1.0
 TRANSFORM_DEFAULT.transform[4][4] = 1.0
 
-class WinMagnificationScreenCurtain(ColorEnhancer):
+class VisionEnhancementProvider(ColorEnhancer):
 	"""Screen curtain implementation based on the windows magnification API.
 	This is only supported on Windows 8 and abbove."""
 	name = "screenCurtain"
@@ -37,7 +37,7 @@ class WinMagnificationScreenCurtain(ColorEnhancer):
 
 	def __init__(self, *roles):
 		winMagnification.Initialize()
-		super(WinMagnificationScreenCurtain, self).__init__(*roles)
+		super(VisionEnhancementProvider, self).__init__(*roles)
 
 	def _getAvailableTransformations(self):
 		return [
@@ -47,7 +47,7 @@ class WinMagnificationScreenCurtain(ColorEnhancer):
 		]
 
 	def initializeColorEnhancer(self):
-		super(WinMagnificationScreenCurtain, self).initializeColorEnhancer()
+		super(VisionEnhancementProvider, self).initializeColorEnhancer()
 		self.transformation = "black"
 
 	def _get_transformation(self):
@@ -60,8 +60,8 @@ class WinMagnificationScreenCurtain(ColorEnhancer):
 
 	def terminateColorEnhancer(self):
 		self.transformation = "off"
-		super(WinMagnificationScreenCurtain, self).terminateColorEnhancer()
+		super(VisionEnhancementProvider, self).terminateColorEnhancer()
 
 	def terminate(self, *roles):
-		super(WinMagnificationScreenCurtain, self).terminate(*roles)
+		super(VisionEnhancementProvider, self).terminate(*roles)
 		winMagnification.Uninitialize()

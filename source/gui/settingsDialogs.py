@@ -2690,11 +2690,11 @@ class VisionProviderSelectionDialog(SettingsDialog):
 		self._state = defaultdict(set)
 		for role in self.availableRoles:
 			providerName = config.conf['vision'][role]
-			# Make sure we do not evaluate conflicts for unregistered providers.
+			# Make sure we do not evaluate conflicts for unavailable providers.
 			try:
-				vision.getProviderCls(providerName)
+				vision.getProvider(providerName)
 				self._state[providerName].add(role)
-			except ValueError:
+			except ImportError:
 				self._state[None].add(role)
 		self._oldState = deepcopy(self._state)
 		providerList = vision.getProviderList()

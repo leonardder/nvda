@@ -1,4 +1,4 @@
-#visionEnhancementProviders/NVDAHighlighter.py
+#visionEnhancementProviders/VisionEnhancementProvider.py
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
@@ -161,19 +161,19 @@ class NVDAHighlighterSettingsPanel(SettingsPanel):
 		# Translators: This is the label for a checkbox in the
 		# default highlighter settings panel to enable highlighting the focus.
 		self.highlightFocusCheckBox=sHelper.addItem(wx.CheckBox(self,label=_("Highlight &focus")))
-		self.highlightFocusCheckBox.SetValue(config.conf['vision'][NVDAHighlighter.name]["highlightFocus"])
+		self.highlightFocusCheckBox.SetValue(config.conf['vision'][VisionEnhancementProvider.name]["highlightFocus"])
 		# Translators: This is the label for a checkbox in the
 		# default highlighter settings panel to enable highlighting the navigator object.
 		self.highlightNavigatorObjCheckBox=sHelper.addItem(wx.CheckBox(self,label=_("Highlight &navigator object")))
-		self.highlightNavigatorObjCheckBox.SetValue(config.conf['vision'][NVDAHighlighter.name]["highlightNavigatorObj"])
+		self.highlightNavigatorObjCheckBox.SetValue(config.conf['vision'][VisionEnhancementProvider.name]["highlightNavigatorObj"])
 		# Translators: This is the label for a checkbox in the
 		# default highlighter settings panel to enable highlighting the virtual caret (such as in browse mode).
 		self.highlightCaretCheckBox=sHelper.addItem(wx.CheckBox(self,label=_("Follow &browse mode caret")))
-		self.highlightCaretCheckBox.SetValue(config.conf['vision'][NVDAHighlighter.name]["highlightCaret"])
+		self.highlightCaretCheckBox.SetValue(config.conf['vision'][VisionEnhancementProvider.name]["highlightCaret"])
 
 	def onSave(self):
-		config.conf['vision'][NVDAHighlighter.name]["highlightFocus"]=self.highlightFocusCheckBox.IsChecked()
-		config.conf['vision'][NVDAHighlighter.name]["highlightNavigatorObj"]=self.highlightNavigatorObjCheckBox.IsChecked()
-		config.conf['vision'][NVDAHighlighter.name]["highlightCaret"]=self.highlightCaretCheckBox.IsChecked()
+		config.conf['vision'][VisionEnhancementProvider.name]["highlightFocus"]=self.highlightFocusCheckBox.IsChecked()
+		config.conf['vision'][VisionEnhancementProvider.name]["highlightNavigatorObj"]=self.highlightNavigatorObjCheckBox.IsChecked()
+		config.conf['vision'][VisionEnhancementProvider.name]["highlightCaret"]=self.highlightCaretCheckBox.IsChecked()
 
-NVDAHighlighter.guiPanelCls = NVDAHighlighterSettingsPanel
+VisionEnhancementProvider.guiPanelCls = NVDAHighlighterSettingsPanel
