@@ -522,4 +522,16 @@ class BrailleInputGesture(inputCore.InputGesture):
 				dots += 1 << dot
 		return (source, cls._makeDisplayText(dots, space))
 
+	def _get_speechEffectWhenExecuted(self):
+		if inputCore.manager.isInputHelpActive:
+			return self.SPEECHEFFECT_CANCEL
+		if not self.script:
+			return super(BrailleInputGesture, self).speechEffectWhenExecuted
+		scriptName = self.script.__name__[7:]
+		if not config.conf['keyboard']['speechInterruptForCharacters'] and scriptName == "braille_dots":
+			return None
+		if not config.conf['keyboard']['speechInterruptForEnter'] and scriptName == "braille_enter":
+			return None
+		return super(BrailleInputGesture, self).speechEffectWhenExecuted
+
 inputCore.registerGestureSource("bk", BrailleInputGesture)

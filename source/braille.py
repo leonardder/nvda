@@ -2535,7 +2535,7 @@ class BrailleDisplayGesture(inputCore.InputGesture):
 		if inputCore.manager.isInputHelpActive:
 			return self.SPEECHEFFECT_CANCEL
 		# L{inputCore.inputManager.executeGesture} already feftched the script, so this should be pretty harmless.
-		if not config.conf["braille"]["speechInterruptForMovement"] or not self.script:
+		if config.conf["braille"]["speechInterruptForMovement"] or not self.script:
 			return super(BrailleDisplayGesture, self).speechEffectWhenExecuted
 		if self.script.__name__[7:] in self._MOVEMENT_SCRIPT_NAMES:
 			return None
