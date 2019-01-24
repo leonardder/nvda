@@ -2525,6 +2525,22 @@ class BrailleDisplayGesture(inputCore.InputGesture):
 		else:
 			return description, key
 
+	_MOVEMENT_SCRIPT_NAMES = (
+		"braille_scrollForward",
+		"braille_scrollBack",
+		"braille_nextLine",
+		"braille_previousLine",
+	)
+	def _get_speechEffectWhenExecuted(self):
+		if inputCore.manager.isInputHelpActive:
+			return self.SPEECHEFFECT_CANCEL
+		# L{inputCore.inputManager.executeGesture} already feftched the script, so this should be pretty harmless.
+		if not config.conf["braille"]["speechInterruptForMovement"] or not self.script:
+			return super(BrailleDisplayGesture, self).speechEffectWhenExecuted
+		if self.script.__name__[7:] in self._MOVEMENT_SCRIPT_NAMES:
+			return None
+		return super(BrailleDisplayGesture, self).speechEffectWhenExecuted
+
 inputCore.registerGestureSource("br", BrailleDisplayGesture)
 
 
