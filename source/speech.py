@@ -28,6 +28,12 @@ import speechDictHandler
 import characterProcessing
 import languageHandler
 
+# Speech interrupt reasons
+INTERRUPT_REASON_CHARACTER = "character"
+INTERRUPT_REASON_ENTER = "enter"
+INTERRUPT_REASON_BRAILLE_MOVEMENT = "brailleMovement"
+
+# Speech modes
 speechMode_off=0
 speechMode_beeps=1
 speechMode_talk=2
