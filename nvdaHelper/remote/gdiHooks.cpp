@@ -44,6 +44,12 @@ wchar_t* WA_strncpy(wchar_t* dest, const wchar_t* source, size_t size) {
 	return wcsncpy(dest,source,size);
 }
 
+BOOL isTransparentBrush(HBRUSH hBrush) {
+	LOGBRUSH lbrush;
+	if(!GetObject(hBrush,sizeof(lbrush),&lbrush)) return FALSE;
+	return lbrush.lbStyle==BS_NULL;
+}
+
 map<HWND,int> windowsForTextChangeNotifications;
 map<HWND,RECT> textChangeNotifications;
 UINT_PTR textChangeNotifyTimerID=0;
@@ -620,6 +626,8 @@ int WINAPI fake_FillRect(HDC hdc, const RECT* lprc, HBRUSH hBrush) {
 	int res=real_FillRect(hdc,lprc,hBrush);
 	//IfThe fill was successull we can go on.
 	if(res==0||lprc==NULL) return res;
+	//Stop if the brush is transparent
+	if(isTransparentBrush(hBrush)) return res;
 	//Try and get a displayModel for this DC, and if we can, then record the original text for these glyphs
 	displayModel_t* model=acquireDisplayModel(hdc,TRUE);
 	if(!model) return res;
