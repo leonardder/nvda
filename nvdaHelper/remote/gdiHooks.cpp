@@ -688,6 +688,8 @@ BOOL WINAPI fake_PatBlt(HDC hdc, int nxLeft, int nxTop, int nWidth, int nHeight,
 	BOOL res=real_PatBlt(hdc,nxLeft,nxTop,nWidth,nHeight,dwRop);
 	//IfPatBlt was successfull we can go on
 	if(res==0) return res;
+	//Stop if copying a transparent brush
+	if(dwRop==PATCOPY&&isTransparentBrush((HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH))) return res;
 	//Try and get a displayModel for this DC, and if we can, then record the original text for these glyphs
 	displayModel_t* model=acquireDisplayModel(hdc,TRUE);
 	if(!model) return res;
