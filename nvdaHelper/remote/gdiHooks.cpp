@@ -785,6 +785,7 @@ SelectObject_funcType real_SelectObject=NULL;
 HGDIOBJ WINAPI fake_SelectObject(HDC hdc, HGDIOBJ hGdiObj) {
 	//Call the real SelectObject
 	HGDIOBJ res=real_SelectObject(hdc,hGdiObj);
+	return res;
 	//If The select was successfull, and the object is a bitmap,  we can go on.
 	if(res==0||hGdiObj==NULL||GetObjectType(hGdiObj)!=OBJ_BITMAP) return res;
 	//Try and get a displayModel for this DC
