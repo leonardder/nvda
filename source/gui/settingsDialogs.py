@@ -2731,7 +2731,7 @@ class VisionProviderSelectionDialog(SettingsDialog):
 		index = evt.Int
 		if index != self.providerList.Selection:
 			# Toggled an unselected provider
-			return
+			self.providerList.Select(index)
 		providerName = self.providerNames[index]
 		providerRoles = self.providerSupportedRolesList[index]
 		itemsToProcess = []
