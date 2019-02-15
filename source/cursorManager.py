@@ -113,6 +113,12 @@ class CursorManager(documentBase.TextContainerObject,baseObject.ScriptableObject
 		braille.handler.handleCaretMove(self)
 
 	def _caretMovementScriptHelper(self,gesture,unit,direction=None,posConstant=textInfos.POSITION_SELECTION,posUnit=None,posUnitEnd=False,extraDetail=False,handleSymbols=False):
+		if core.debugPerformance():
+			log.debug("Initiated %s caret move, unit=%s, direction=%d" % (
+				self.__class__.__name__,
+				unit,
+				direction
+			))
 		oldInfo=self.makeTextInfo(posConstant)
 		info=oldInfo.copy()
 		info.collapse(end=self.isTextSelectionAnchoredAtStart)
@@ -145,6 +151,8 @@ class CursorManager(documentBase.TextContainerObject,baseObject.ScriptableObject
 		if not willSayAllResume(gesture): speech.speakTextInfo(info,unit=unit,reason=controlTypes.REASON_CARET)
 		if not oldInfo.isCollapsed:
 			speech.speakSelectionChange(oldInfo,self.selection)
+		if core.debugPerformance():
+			log.debug("Finished %s caret move" % self.__class__.__name__)
 
 	def doFindText(self,text,reverse=False,caseSensitive=False):
 		if not text:
