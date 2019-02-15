@@ -62,6 +62,8 @@ def isPendingItems(queue):
 	return res
 
 def pumpAll():
+	if core.debugPerformance():
+		log.debug("Start of queueHandler pump")
 	# This dict can mutate during iteration, so use keys().
 	for ID in generators.keys():
 		# KeyError could occur within the generator itself, so retrieve the generator first.
@@ -84,3 +86,5 @@ def pumpAll():
 	if generators:
 		core.requestPump()
 	flushQueue(eventQueue)
+	if core.debugPerformance():
+		log.debug("End of queueHandler pump")
