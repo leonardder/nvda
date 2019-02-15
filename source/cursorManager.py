@@ -26,6 +26,7 @@ import controlTypes
 from inputCore import SCRCAT_BROWSEMODE
 import ui
 from textInfos import DocumentWithPageTurns
+from logHandler import log
 
 class FindDialog(wx.Dialog):
 	"""A dialog used to specify text to find in a cursor manager.
@@ -114,7 +115,7 @@ class CursorManager(documentBase.TextContainerObject,baseObject.ScriptableObject
 
 	def _caretMovementScriptHelper(self,gesture,unit,direction=None,posConstant=textInfos.POSITION_SELECTION,posUnit=None,posUnitEnd=False,extraDetail=False,handleSymbols=False):
 		if core.debugPerformance():
-			log.debug("Initiated %s caret move, unit=%s, direction=%d" % (
+			log.debug("Initiated %s caret move, unit=%s, direction=%S" % (
 				self.__class__.__name__,
 				unit,
 				direction

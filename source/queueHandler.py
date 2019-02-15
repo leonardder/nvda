@@ -49,10 +49,15 @@ def flushQueue(queue):
 		if not queue.empty():
 			(func,args,kwargs)=queue.get_nowait()
 			watchdog.alive()
+			if core.debugPerformance():
+				log.debug("Executing func %s from %s with args %r and kwargs %r"%(func.__name__,queue.__name__,args,kwargs))
 			try:
 				func(*args,**kwargs)
 			except:
 				log.exception("Error in func %s from %s"%(func.__name__,queue.__name__))
+			else:
+				if core.debugPerformance():
+					log.debug("Finished executing func %s from %s"%(func.__name__,queue.__name__))
 
 def isPendingItems(queue):
 	if not queue.empty():
