@@ -607,3 +607,6 @@ def callLater(delay, callable, *args, **kwargs):
 def _callLaterExec(callable, args, kwargs):
 	import queueHandler
 	queueHandler.queueFunction(queueHandler.eventQueue,callable,*args, **kwargs)
+
+def debugPerformance():
+	return config.conf["debugLog"]["performance"]

@@ -205,6 +205,7 @@ schemaVersion = integer(min=0, default={latestSchemaVersion})
 	gui = boolean(default=false)
 	louis = boolean(default=false)
 	timeSinceInput = boolean(default=false)
+	performance = boolean(default=false)
 
 [uwpOcr]
 	language = string(default="")
