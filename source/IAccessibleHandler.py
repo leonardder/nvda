@@ -855,6 +855,8 @@ def pumpAll():
 			# (Sometimes, foreground events are fired even when the foreground hasn't actually changed.)
 			_deferUntilForegroundWindow=None
 
+	if core.debugPerformance():
+		log.debug("Start of IAccessibleHandler pump")
 	#Receive all the winEvents from the limiter for this cycle
 	winEvents=winEventLimiter.flushEvents()
 	focusWinEvents=[]
@@ -908,6 +910,8 @@ def pumpAll():
 		elif not validFocus:
 			# Other fake focus events only need to be handled if there was no valid focus event.
 			processFakeFocusWinEvent(*fakeFocusEvent)
+	if core.debugPerformance():
+		log.debug("End of IAccessibleHandler pump")
 
 def terminate():
 	for handle in winEventHookIDs:
