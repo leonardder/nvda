@@ -46,7 +46,10 @@ wchar_t* WA_strncpy(wchar_t* dest, const wchar_t* source, size_t size) {
 
 BOOL isTransparentBrush(HBRUSH hBrush) {
 	LOGBRUSH lbrush;
-	if(!GetObject(hBrush,sizeof(lbrush),&lbrush)) return FALSE;
+	if(!GetObject(hBrush,sizeof(lbrush),&lbrush)) {
+		LOG_ERROR("isTransparentBrush failed");
+		return FALSE;
+	}
 	return lbrush.lbStyle==BS_NULL;
 }
 
@@ -689,7 +692,7 @@ BOOL WINAPI fake_PatBlt(HDC hdc, int nxLeft, int nxTop, int nWidth, int nHeight,
 	//IfPatBlt was successfull we can go on
 	if(res==0) return res;
 	//Stop if copying a transparent brush
-	if(dwRop==PATCOPY&&isTransparentBrush((HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH))) return res;
+	if(dwRop==PATCOPY||isTransparentBrush((HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH))) return res;
 	//Try and get a displayModel for this DC, and if we can, then record the original text for these glyphs
 	displayModel_t* model=acquireDisplayModel(hdc,TRUE);
 	if(!model) return res;
