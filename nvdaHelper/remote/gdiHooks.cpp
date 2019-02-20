@@ -50,6 +50,7 @@ BOOL isTransparentBrush(HBRUSH hBrush) {
 		LOG_ERROR("isTransparentBrush failed");
 		return FALSE;
 	}
+	LOG_ERROR("Brush: style="<<lbrush.lbStyle<<", color="<<lbrush.lbColor<<", hatch="<<lbrush.lbHatch);
 	return lbrush.lbStyle==BS_NULL;
 }
 
@@ -630,6 +631,7 @@ int WINAPI fake_FillRect(HDC hdc, const RECT* lprc, HBRUSH hBrush) {
 	//IfThe fill was successull we can go on.
 	if(res==0||lprc==NULL) return res;
 	//Stop if the brush is transparent
+	return res;
 	if(isTransparentBrush(hBrush)) return res;
 	//Try and get a displayModel for this DC, and if we can, then record the original text for these glyphs
 	displayModel_t* model=acquireDisplayModel(hdc,TRUE);
@@ -692,7 +694,7 @@ BOOL WINAPI fake_PatBlt(HDC hdc, int nxLeft, int nxTop, int nWidth, int nHeight,
 	//IfPatBlt was successfull we can go on
 	if(res==0) return res;
 	//Stop if copying a transparent brush
-	if(dwRop==PATCOPY||isTransparentBrush((HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH))) return res;
+	if(dwRop==PATCOPY&&isTransparentBrush((HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH))) return res;
 	//Try and get a displayModel for this DC, and if we can, then record the original text for these glyphs
 	displayModel_t* model=acquireDisplayModel(hdc,TRUE);
 	if(!model) return res;
