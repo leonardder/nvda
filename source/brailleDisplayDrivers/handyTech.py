@@ -712,7 +712,7 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver, ScriptableObject):
 				self.terminate()
 
 		if htPacketType==HT_PKT_OK:
-			pass
+			self._keysDown.clear()
 		elif htPacketType == HT_PKT_ACK:
 			# This is unexpected, but we need to make sure that we handle old style ack
 			self._handleAck()
