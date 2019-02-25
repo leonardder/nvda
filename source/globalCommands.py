@@ -2213,9 +2213,10 @@ class GlobalCommands(ScriptableObject):
 			return
 		scriptCount=scriptHandler.getLastScriptRepeatCount()
 		screenCurtainName = "screenCurtain"
-		screenCurtainCls = vision.getProviderCls(screenCurtainName)
-		if isinstance(vision.handler.colorEnhancer, screenCurtainCls):
+		screenCurtainCls = vision.getProvider(screenCurtainName)
+		if scriptCount == 0 and isinstance(vision.handler.colorEnhancer, screenCurtainCls):
 			vision.handler.setProvider(None, vision.ROLE_COLORENHANCER)
+			# Translators: Reported when the screen curtain is disabled.
 			ui.message(_("Screen curtain disabled"))
 		elif scriptCount in (0, 2):
 			temporary = scriptCount==0
@@ -2228,10 +2229,16 @@ class GlobalCommands(ScriptableObject):
 				)
 			except:
 				log.debugWarning("Couldn't enable screen curtain", exc_info=True)
+				# Translators: Reported when the screen curtain could not be enabled.
 				ui.message(_("Could not enable screen curtain"))
 				return
 			else:
-				ui.message(_("Screen curtain enabled"))
+				if temporary:
+					# Translators: Reported when the screen curtain is temporarily enabled.
+					ui.message(_("Screen curtain enabled until next restart"))
+				else:
+					# Translators: Reported when the screen curtain is enabled.
+					ui.message(_("Screen curtain enabled"))
 	# Translators: Describes a command.
 	script_toggleScreenCurtain.__doc__ = _("Toggles the state of the screen curtain, either hiding or viewing the contents of the screen")
 
