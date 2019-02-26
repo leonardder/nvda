@@ -126,6 +126,7 @@ libs = [
 	"version",
 	"DbgHelp",
 	"gdi32",
+	"Msimg32",
 ]
 # MinHook doesn't support ARM64, which means we can't support displayModel on ARM64.
 if env["TARGET_ARCH"] != 'arm64':
