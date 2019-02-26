@@ -51,7 +51,7 @@ BOOL isTransparentBrush(HBRUSH hBrush) {
 		return FALSE;
 	}
 	if (lbrush.lbStyle!=0)
-	LOG_ERROR("Brush: style="<<lbrush.lbStyle<<", color="<<lbrush.lbColor<<", hatch="<<lbrush.lbHatch);
+		LOG_ERROR("Brush: style="<<lbrush.lbStyle<<", color="<<lbrush.lbColor<<", hatch="<<lbrush.lbHatch);
 	return lbrush.lbStyle==BS_NULL;
 }
 
@@ -638,6 +638,7 @@ int WINAPI fake_FillRect(HDC hdc, const RECT* lprc, HBRUSH hBrush) {
 	if(!model) return res;
 	RECT rect=*lprc;
 	dcPointsToScreenPoints(hdc,(LPPOINT)&rect,2,false);
+	LOG_DEBUGWARNING(L"Clearing rectangle from "<<rect.left<<L","<<rect.top<<L" to "<<rect.right<<L","<<rect.bottom);
 	model->clearRectangle(rect);
 	model->release();
 	return res;
