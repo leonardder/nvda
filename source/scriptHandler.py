@@ -84,7 +84,7 @@ def findScript(gesture):
 			return func
 
 	# Global plugin level.
-	for plugin in globalPluginHandler.runningPlugins:
+	for plugin in list(globalPluginHandler.runningPlugins):
 		func = _getObjScript(plugin, gesture, globalMapScripts)
 		if func:
 			return func
