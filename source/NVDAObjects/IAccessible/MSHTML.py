@@ -665,7 +665,9 @@ class MSHTML(IAccessible):
 			#Adding an ARIA landmark or unknown role to a DIV or NAV node makes an IAccessible with role_system_grouping and a name calculated from descendants.
 			# This name should also be ignored, but check NVDA's role, not accRole as its possible that NVDA chose a better role
 			# E.g. row (#2780)
-			(self.HTMLNodeName in ("DIV","NAV") and self.role==controlTypes.ROLE_GROUPING)
+			(self.HTMLNodeName in ("DIV","NAV") and self.role==controlTypes.ROLE_GROUPING) or
+			# The name of an (i)frame is set to the url of the frame, which is very verbose.
+			self.HTMLNodeName in ("FRAME","IFRAME")
 		):
 			title=self.HTMLAttributes['title']
 			# #2121: MSHTML sometimes returns a node for the title attribute.
@@ -701,7 +703,11 @@ class MSHTML(IAccessible):
 					return descNode.innerText
 				except (COMError,NameError):
 					pass
-		if self.HTMLNodeHasAncestorIAccessible:
+		if (
+			self.HTMLNodeHasAncestorIAccessible or
+			# Frames and iframes have a redundant description.
+			self.HTMLNodeName in ("FRAME","IFRAME")
+		):
 			return ""
 		return super(MSHTML,self).description
 
