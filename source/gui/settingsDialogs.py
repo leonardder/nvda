@@ -262,7 +262,7 @@ class SettingsPanel(with_metaclass(guiHelper.SIPABCMeta, wx.Panel, DpiScalingHel
 	"""
 
 	title=""
-	panelDescription=""
+	panelDescription=u""
 
 	def __init__(self, parent):
 		"""
@@ -2119,7 +2119,7 @@ class AdvancedPanel(SettingsPanel):
 		"have been specifically instructed by NVDA developers."
 	)
 
-	panelDescription = "{}\n{}".format(warningHeader, warningExplanation)
+	panelDescription = u"{}\n{}".format(warningHeader, warningExplanation)
 
 	def makeSettings(self, settingsSizer):
 		"""
