@@ -377,7 +377,7 @@ class MultiCategorySettingsDialog(SettingsDialog):
 		self.initialCategory = initialCategory
 		self.currentCategory = None
 		self.setPostInitFocus = None
-		# dictionary key is index of category in self.catList, value is the instance. Partially filled, check for KeyError
+		# dictionary key is index of category in self.catTree, value is the instance. Partially filled, check for KeyError
 		self.catIdToInstanceMap = {}
 
 		super(MultiCategorySettingsDialog, self).__init__(
@@ -413,23 +413,20 @@ class MultiCategorySettingsDialog(SettingsDialog):
 		# These sizes are set manually so that the initial proportions within the dialog look correct. If these sizes are
 		# not given, then I believe the proportion arguments (as given to the gridBagSizer.AddGrowableColumn) are used
 		# to set their relative sizes. We want the proportion argument to be used for resizing, but not the initial size.
-		catListDim = (150, 10)
-		catListDim = self.scaleSize(catListDim)
+		catTreeDim = (150, 10)
+		catTreeDim = self.scaleSize(catTreeDim)
 
 		initialScaledWidth = self.scaleSize(self.INITIAL_SIZE[0])
 		spaceForBorderWidth = self.scaleSize(20)
-		catListWidth = catListDim[0]
-		containerDim = (initialScaledWidth - catListWidth - spaceForBorderWidth, self.scaleSize(10))
+		catTreeWidth = catTreeDim[0]
+		containerDim = (initialScaledWidth - catTreeWidth - spaceForBorderWidth, self.scaleSize(10))
 
-		self.catListCtrl = nvdaControls.AutoWidthColumnListCtrl(
+		self.catTreeCtrl = wx.TreeCtrl(
 			self,
-			autoSizeColumnIndex=0,
-			size=catListDim,
-			style=wx.LC_REPORT|wx.LC_SINGLE_SEL|wx.LC_NO_HEADER
+			size=catTreeDim,
+			style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT | wx.TR_LINES_AT_ROOT | wx.TR_SINGLE
 		)
-		# This list consists of only one column.
-		# The provided column header is just a placeholder, as it is hidden due to the wx.LC_NO_HEADER style flag.
-		self.catListCtrl.InsertColumn(0,categoriesLabelText)
+		self.catTreeRoot = self.catTreeCtrl.AddRoot("root")
 
 		self.container = scrolledpanel.ScrolledPanel(
 			parent = self,
@@ -439,7 +436,7 @@ class MultiCategorySettingsDialog(SettingsDialog):
 
 		# Th min size is reset so that they can be reduced to below their "size" constraint.
 		self.container.SetMinSize((1,1))
-		self.catListCtrl.SetMinSize((1,1))
+		self.catTreeCtrl.SetMinSize((1,1))
 
 		self.containerSizer = wx.BoxSizer(wx.VERTICAL)
 		self.container.SetSizer(self.containerSizer)
@@ -447,17 +444,15 @@ class MultiCategorySettingsDialog(SettingsDialog):
 		for cls in self.categoryClasses:
 			if not issubclass(cls,SettingsPanel):
 				raise RuntimeError("Invalid category class %s provided in %s.categoryClasses"%(cls.__name__,self.__class__.__name__))
-			# It's important here that the listItems are added to catListCtrl in the same order that they exist in categoryClasses.
+			# It's important here that the listItems are added to catTreeCtrl in the same order that they exist in categoryClasses.
 			# the ListItem index / Id is used to index categoryClasses, and used as the key in catIdToInstanceMap
-			self.catListCtrl.Append((cls.title,))
+			self.catTreeCtrl.AppendItem(self.catTreeRoot, cls.title)
 
 		# populate the GUI with the initial category
 		initialCatIndex = 0 if not self.initialCategory else self.categoryClasses.index(self.initialCategory)
 		self._doCategoryChange(initialCatIndex)
-		self.catListCtrl.Select(initialCatIndex)
-		# we must focus the initial category in the category list.
-		self.catListCtrl.Focus(initialCatIndex)
-		self.setPostInitFocus = self.container.SetFocus if self.initialCategory else self.catListCtrl.SetFocus
+		self.catTreeCtrl.SelectItem(initialCatIndex)
+		self.setPostInitFocus = self.container.SetFocus if self.initialCategory else self.catTreeCtrl.SetFocus
 
 		self.gridBagSizer=gridBagSizer=wx.GridBagSizer(
 			hgap=guiHelper.SPACE_BETWEEN_BUTTONS_HORIZONTAL,
@@ -467,7 +462,7 @@ class MultiCategorySettingsDialog(SettingsDialog):
 		# The label should span two columns, so that the start of the categories list
 		# and the start of the settings panel are at the same vertical position.
 		gridBagSizer.Add(categoriesLabel, pos=(0,0), span=(1,2))
-		gridBagSizer.Add(self.catListCtrl, pos=(1,0), flag=wx.EXPAND)
+		gridBagSizer.Add(self.catTreeCtrl, pos=(1,0), flag=wx.EXPAND)
 		gridBagSizer.Add(self.container, pos=(1,1), flag=wx.EXPAND)
 		# Make the row with the listCtrl and settings panel grow vertically.
 		gridBagSizer.AddGrowableRow(1)
@@ -479,7 +474,7 @@ class MultiCategorySettingsDialog(SettingsDialog):
 		sHelper.sizer.Add(gridBagSizer, flag=wx.EXPAND, proportion=1)
 
 		self.container.Layout()
-		self.catListCtrl.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.onCategoryChange)
+		self.catTreeCtrl.Bind(wx.EVT_TREE_SEL_CHANGED, self.onCategoryChange)
 		self.Bind(wx.EVT_CHAR_HOOK, self.onCharHook)
 		self.Bind(EVT_RW_LAYOUT_NEEDED, self._onPanelLayoutChanged)
 
@@ -523,30 +518,30 @@ class MultiCategorySettingsDialog(SettingsDialog):
 		else:
 			# when postInit is called without a setPostInitFocus ie because onApply was called
 			# then set the focus to the listCtrl. This is a good starting point for a "fresh state"
-			self.catListCtrl.SetFocus()
+			self.catTreeCtrl.SetFocus()
 
 
 	def onCharHook(self,evt):
 		"""Listens for keyboard input and switches panels for control+tab"""
-		if not self.catListCtrl:
+		if not self.catTreeCtrl:
 			# Dialog has not yet been constructed.
 			# Allow another handler to take the event, and return early.
 			evt.Skip()
 			return
 		key = evt.GetKeyCode()
-		listHadFocus = self.catListCtrl.HasFocus()
+		treeHadFocus = self.catTreeCtrl.HasFocus()
 		if evt.ControlDown() and key==wx.WXK_TAB:
-			# Focus the categories list. If we don't, the panel won't hide correctly
-			if not listHadFocus:
-				self.catListCtrl.SetFocus()
-			index = self.catListCtrl.GetFirstSelected()
+			# Focus the categories tree. If we don't, the panel won't hide correctly
+			if not treeHadFocus:
+				self.catTreeCtrl.SetFocus()
+			index = self.catTreeCtrl.Selection
 			newIndex=index-1 if evt.ShiftDown() else index+1
 			# Less than first wraps to the last index, greater than last wraps to first index.
-			newIndex=newIndex % self.catListCtrl.ItemCount
-			self.catListCtrl.Select(newIndex)
+			newIndex=newIndex % self.catTreeCtrl.ItemCount
+			self.catTreeCtrl.Select(newIndex)
 			# we must focus the new selection in the category list to trigger the change of category.
-			self.catListCtrl.Focus(newIndex)
-			if not listHadFocus and self.currentCategory:
+			self.catTreeCtrl.Focus(newIndex)
+			if not treeHadFocus and self.currentCategory:
 				self.currentCategory.SetFocus()
 		else:
 			evt.Skip()
@@ -568,7 +563,7 @@ class MultiCategorySettingsDialog(SettingsDialog):
 		try:
 			newCat = self._getCategoryPanel(newCatId)
 		except ValueError as e:
-			newCatTitle = self.catListCtrl.GetItemText(newCatId)
+			newCatTitle = self.catTreeCtrl.GetItemText(newCatId)
 			log.error("Unable to change to category: {}".format(newCatTitle), exc_info=e)
 			return
 		if oldCat:
