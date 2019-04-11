@@ -56,6 +56,7 @@ class VisionEnhancementProvider(Highlighter):
 	# Translators: Description for NVDA's built-in screen highlighter.
 	description = _("NVDA Highlighter")
 	supportedHighlightContexts = (CONTEXT_FOCUS, CONTEXT_NAVIGATOR, CONTEXT_CARET)
+	customHighlightContexts = (CONTEXT_FOCUS_NAVIGATOR,)
 	_ContextStyles = {
 		CONTEXT_FOCUS: HighlightStyle(RGB(0x03, 0x36, 0xff), 5, winGDI.DashStyleDash, 5),
 		CONTEXT_NAVIGATOR: HighlightStyle(RGB(0xff, 0x02, 0x66), 5, winGDI.DashStyleSolid, 5),
@@ -67,7 +68,8 @@ class VisionEnhancementProvider(Highlighter):
 	def initializeHighlighter(self):
 		super(VisionEnhancementProvider, self).initializeHighlighter()
 		winGDI.gdiPlusInitialize()
-		self.window = None
+		self.windows = {}
+		self.transparentBrush = winGDI.gdi32.CreateSolidBrush(COLORREF(0))
 		self._highlighterThread = threading.Thread(target=self._run)
 		self._highlighterThread.daemon = True
 		self._highlighterThread.start()
@@ -84,102 +86,29 @@ class VisionEnhancementProvider(Highlighter):
 	def _run(self):
 		if _isDebug():
 			log.debug("Starting NVDAHighlighter thread")
-		window = self.window = HighlightWindow(self)
-		timer = 	winUser.user32.SetTimer(window.handle, 0, self.refreshInterval, None)
+		for context in self.supportedHighlightContexts + self.customHighlightContexts:
+			self.windows[context] = highlightWindowFactory(context)(self)
+		timer = 	winUser.user32.SetTimer(0, 0, self.refreshInterval, None)
 		msg = MSG()
-		while winUser.getMessage(byref(msg),None,0,0):
+		while winUser.getMessage(byref(msg),None,0,0) != 0:
+			# Avoid using a timer
+			if msg.message == winUser.WM_TIMER:
+				self.refresh()
+				continue
 			winUser.user32.TranslateMessage(byref(msg))
 			winUser.user32.DispatchMessageW(byref(msg))
 		if _isDebug():
 			log.debug("Quit message received on NVDAHighlighter thread")
-		if not winUser.user32.KillTimer(window.handle, 0):
+		if not winUser.user32.KillTimer(0, timer):
 			raise WinError()
-		if self.window:
-			self.window.destroy()
-			self.window = None
+		for window in self.windows.values():
+			window.destroy()
+		self.windows.clear()
 
 	def refresh(self):
-		if self.window:
-			self.window.refresh()
-
-class HighlightWindow(CustomWindow):
-	transparency = 0xff
-	className = u"NVDAHighlighter"
-	windowName = u"NVDA Highlighter Window"
-	windowStyle = winUser.WS_POPUP | winUser.WS_DISABLED
-	extendedWindowStyle = winUser.WS_EX_TOPMOST | winUser.WS_EX_LAYERED
-
-	@classmethod
-	def _get__wClass(cls):
-		wClass = super(HighlightWindow, cls)._wClass
-		wClass.style = winUser.CS_HREDRAW | winUser.CS_VREDRAW
-		return wClass
-
-	def updateLocationForDisplays(self):
-		if _isDebug():
-			log.debug("Updating NVDAHighlighter window location for displays")
-		displays = [ wx.Display(i).GetGeometry() for i in xrange(wx.Display.GetCount()) ]
-		screenWidth, screenHeight, minPos = getTotalWidthAndHeightAndMinimumPosition(displays)
-		# Hack: Windows has a "feature" that will stop desktop shortcut hotkeys from working when a window is full screen.
-		# Removing one line of pixels from the bottom of the screen will fix this.
-		left = minPos.x
-		top = minPos.y
-		width = screenWidth
-		height = screenHeight-1
-		self.location = RectLTWH(left, top, width, height)
-		winUser.user32.ShowWindow(self.handle, winUser.SW_HIDE)
-		if not winUser.user32.SetWindowPos(
-			self.handle,
-			winUser.HWND_TOPMOST,
-			left, top, width, height,
-			winUser.SWP_NOACTIVATE
-		):
-			raise WinError()
-		winUser.user32.ShowWindow(self.handle, winUser.SW_SHOWNA)
-
-	def __init__(self, highlighter):
-		if _isDebug():
-			log.debug("initializing NVDAHighlighter window")
-		super(HighlightWindow, self).__init__(
-			windowName=self.windowName,
-			windowStyle=self.windowStyle,
-			extendedWindowStyle=self.extendedWindowStyle,
-			parent=gui.mainFrame.Handle
-		)
-		self.highlighterRef = weakref.ref(highlighter)
-		self.transparentBrush = winGDI.gdi32.CreateSolidBrush(COLORREF(0))
-		winUser.SetLayeredWindowAttributes(self.handle, None, self.transparency, winUser.LWA_ALPHA | winUser.LWA_COLORKEY)
-		self.updateLocationForDisplays()
-		if not winUser.user32.UpdateWindow(self.handle):
-			raise WinError()
-
-	def windowProc(self, hwnd, msg, wParam, lParam):
-		if msg == winUser.WM_PAINT:
-			self._paint()
-			# Ensure the window is top most
-			winUser.user32.SetWindowPos(
-				self.handle,
-				winUser.HWND_TOPMOST,
-				0, 0, 0, 0,
-				winUser.SWP_NOACTIVATE | winUser.SWP_NOMOVE | winUser.SWP_NOSIZE
-			)
-		elif msg == winUser.WM_DESTROY:
-			winUser.user32.PostQuitMessage(0)
-		elif msg == winUser.WM_TIMER:
-			self.refresh()
-		elif msg == winUser.WM_DISPLAYCHANGE:
-			# wx might not be aware of the display change at this point
-			core.callLater(100, self.updateLocationForDisplays)
-
-	def _paint(self):
-		highlighter = self.highlighterRef()
-		if not highlighter:
-			# The highlighter instance died unexpectedly, kill the window as well
-			winUser.user32.PostQuitMessage(0)
-			return
 		contextRects = {}
-		for context in highlighter.enabledHighlightContexts:
-			rect = highlighter.contextToRectMap.get(context)
+		for context in self.enabledHighlightContexts:
+			rect = self.contextToRectMap.get(context)
 			if not rect:
 				continue
 			if context == CONTEXT_CARET and not isinstance(api.getCaretObject(), cursorManager.CursorManager):
@@ -195,32 +124,95 @@ class HighlightWindow(CustomWindow):
 				contextRects.pop(CONTEXT_NAVIGATOR, None)
 				context = CONTEXT_FOCUS_NAVIGATOR
 			contextRects[context] = rect
-		if not contextRects:
+		windowContexts = set(self.windows.keys())
+		showWindowContexts = set(contextRects)
+		for context in windowContexts:
+			window = self.windows[context]
+			if context in showWindowContexts:
+				window.move(contextRects[context])
+				window.show()
+				#window.refresh()
+			else:
+				window.show(False)
+
+class HighlightWindow(CustomWindow):
+	transparency = 0xff
+	windowStyle = winUser.WS_POPUP | winUser.WS_DISABLED
+	extendedWindowStyle = winUser.WS_EX_TOPMOST | winUser.WS_EX_LAYERED
+
+	@classmethod
+	def _get__wClass(cls):
+		wClass = super(HighlightWindow, cls)._wClass
+		wClass.style = winUser.CS_HREDRAW | winUser.CS_VREDRAW
+		return wClass
+
+	def _get_visible(self):
+		return winUser.isWindowVisible(self.handle)
+
+	def show(self, show=True):
+		if show is self.visible:
+			return
+		winUser.user32.ShowWindow(self.handle, winUser.SW_HIDE if not show else winUser.SW_SHOWNA)
+
+	def move(self, rect):
+		highlighter = self.highlighterRef()
+		if not highlighter:
+			raise RuntimeError("Highlight window exists while highlighter died")
+		HighlightStyle = highlighter._ContextStyles[self.context]
+		rect = rect.expandOrShrink(HighlightStyle.margin)
+		self.location = rect
+		if not winUser.user32.SetWindowPos(
+			self.handle,
+			winUser.HWND_TOPMOST,
+			rect.left, rect.top, rect.width, rect.height,
+			winUser.SWP_NOACTIVATE
+		):
+			raise WinError()
+
+	def __init__(self, highlighter):
+		if _isDebug():
+			log.debug("initializing %s" % self.__class__.__name__)
+		super(HighlightWindow, self).__init__(
+			windowName=u"NVDA Highlighter %s window" % self.context,
+			windowStyle=self.windowStyle,
+			extendedWindowStyle=self.extendedWindowStyle,
+			parent=gui.mainFrame.Handle
+		)
+		self.location = RectLTRB(0, 0, 0, 0)
+		self.highlighterRef = weakref.ref(highlighter)
+		winUser.SetLayeredWindowAttributes(self.handle, None, self.transparency, winUser.LWA_ALPHA | winUser.LWA_COLORKEY)
+		if not winUser.user32.UpdateWindow(self.handle):
+			raise WinError()
+
+	def windowProc(self, hwnd, msg, wParam, lParam):
+		if msg == winUser.WM_PAINT:
+			self._paint()
+
+
+	def _paint(self):
+		highlighter = self.highlighterRef()
+		if not highlighter:
+			# The highlighter instance died unexpectedly, kill the window as well
+			winUser.user32.PostQuitMessage(0)
 			return
 		windowRect = winUser.getClientRect(self.handle)
 		with winUser.paint(self.handle) as hdc:
-			winUser.user32.FillRect(hdc, byref(windowRect), self.transparentBrush)
+			winUser.user32.FillRect(hdc, byref(windowRect), highlighter.transparentBrush)
 			with winGDI.GDIPlusGraphicsContext(hdc) as graphicsContext:
-				for context, rect in contextRects.items():
-					HighlightStyle = highlighter._ContextStyles[context]
-					# Before calculating logical coordinates,
-					# make sure the rectangle falls within the highlighter window
-					rect = rect.intersection(self.location)
-					try:
-						rect = rect.toLogical(self.handle)
-					except RuntimeError:
-						log.debugWarning("", exc_info=True)
-					rect = rect.toClient(self.handle)
-					try:
-						rect = rect.expandOrShrink(HighlightStyle.margin)
-					except RuntimeError:
-						pass
-					with winGDI.GDIPlusPen(
-						HighlightStyle.color.toGDIPlusARGB(),
-						HighlightStyle.width,
-						HighlightStyle.style
-					) as pen:
-						winGDI.gdiPlusDrawRectangle(graphicsContext, pen, *rect.toLTWH())
+				HighlightStyle = highlighter._ContextStyles[self.context]
+				with winGDI.GDIPlusPen(
+					HighlightStyle.color.toGDIPlusARGB(),
+					HighlightStyle.width,
+					HighlightStyle.style
+				) as pen:
+					winGDI.gdiPlusDrawRectangle(graphicsContext, pen, *RectLTWH.fromCompatibleType(windowRect))
 
 	def refresh(self):
 		winUser.user32.InvalidateRect(self.handle, None, True)
+
+def highlightWindowFactory(context):
+	contextTitle = context[0].upper()+context[1:]
+	return type("{context}HighlightWindow".format(context=contextTitle), (HighlightWindow,), {
+		"context": context,
+		"className": u"NVDA{context}Highlighter".format(context=contextTitle)
+	})
