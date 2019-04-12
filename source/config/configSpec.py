@@ -81,6 +81,7 @@ schemaVersion = integer(min=0, default={latestSchemaVersion})
 		highlightFocus = boolean(default=true)
 		highlightCaret = boolean(default=true)
 		highlightNavigatorObj = boolean(default=true)
+		highlightReview = boolean(default=true)
 
 # Presentation settings
 [presentation]

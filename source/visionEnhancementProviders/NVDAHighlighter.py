@@ -7,7 +7,7 @@
 
 """Default highlighter based on GDI Plus."""
 
-from vision import Highlighter, CONTEXT_FOCUS, CONTEXT_NAVIGATOR, CONTEXT_CARET, _isDebug
+from vision import Highlighter, CONTEXT_FOCUS, CONTEXT_NAVIGATOR, CONTEXT_CARET, CONTEXT_REVIEW, _isDebug
 from windowUtils import CustomWindow
 import wx
 import gui
@@ -56,12 +56,13 @@ class VisionEnhancementProvider(Highlighter):
 	name = "NVDAHighlighter"
 	# Translators: Description for NVDA's built-in screen highlighter.
 	description = _("NVDA Highlighter")
-	supportedHighlightContexts = (CONTEXT_FOCUS, CONTEXT_NAVIGATOR, CONTEXT_CARET)
+	supportedHighlightContexts = (CONTEXT_FOCUS, CONTEXT_NAVIGATOR, CONTEXT_CARET, CONTEXT_REVIEW)
 	_ContextStyles = {
 		CONTEXT_FOCUS: HighlightStyle(RGB(0x03, 0x36, 0xff), 5, winGDI.DashStyleDash, 5),
 		CONTEXT_NAVIGATOR: HighlightStyle(RGB(0xff, 0x02, 0x66), 5, winGDI.DashStyleSolid, 5),
 		CONTEXT_FOCUS_NAVIGATOR: HighlightStyle(RGB(0x03, 0x36, 0xff), 5, winGDI.DashStyleSolid, 5),
 		CONTEXT_CARET: HighlightStyle(RGB(0xff, 0xde, 0x03), 2, winGDI.DashStyleSolid, 2),
+		CONTEXT_REVIEW: HighlightStyle(RGB(0xff, 0x02, 0x66), 2, winGDI.DashStyleSolid, 2),
 	}
 	refreshInterval = 100
 
@@ -187,11 +188,7 @@ class HighlightWindow(CustomWindow):
 			rect = highlighter.contextToRectMap.get(context)
 			if not rect:
 				continue
-			if context == CONTEXT_CARET and not isinstance(api.getCaretObject(), cursorManager.CursorManager):
-				# Non virtual carets are currently not supported.
-				# As they are physical, they are visible by themselves.
-				continue
-			elif context == CONTEXT_NAVIGATOR and contextRects.get(CONTEXT_FOCUS) == rect:
+			if context == CONTEXT_NAVIGATOR and contextRects.get(CONTEXT_FOCUS) == rect:
 				# When the focus overlaps the navigator object, which is usually the case,
 				# show a different highlight style.
 				# Focus is in contextRects, do not show the standalone focus highlight.
@@ -199,7 +196,18 @@ class HighlightWindow(CustomWindow):
 				# Navigator object might be in contextRects as well
 				contextRects.pop(CONTEXT_NAVIGATOR, None)
 				context = CONTEXT_FOCUS_NAVIGATOR
+			elif context == CONTEXT_REVIEW:
+				# When the caret overlaps the review cursor, which is usually the case,
+				# Hide the review cursor highlight.
+				# Also hide the review cursor when there's no caret.
+				caretRect = contextRects.get(CONTEXT_CARET)
+				if not caretRect or caretRect == rect:
+					continue
 			contextRects[context] = rect
+		if not isinstance(api.getCaretObject(), cursorManager.CursorManager):
+			# Non virtual carets are currently not supported.
+			# As they are physical, they are visible by themselves.
+			contextRects.pop(CONTEXT_CARET, None)
 		if not contextRects:
 			return
 		windowRect = winUser.getClientRect(self.handle)
