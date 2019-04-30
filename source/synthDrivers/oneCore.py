@@ -92,10 +92,6 @@ class SynthDriver(SynthDriver):
 	MIN_RATE = 0.5
 	MAX_RATE = 6.0
 
-	_rate = None
-	_volume = None
-	_pitch = None
-
 	name = "oneCore"
 	# Translators: Description for a speech synthesizer.
 	description = _("Windows OneCore voices")
@@ -130,6 +126,10 @@ class SynthDriver(SynthDriver):
 			self._dll.ocSpeech_getRate.restype = ctypes.c_double
 		else:
 			log.debugWarning("Prosody options not supported")
+			# Use SSML to communicate the below options.
+			self._rate = None
+			self._pitch = None
+			self._volume = None
 		self._handle = self._dll.ocSpeech_initialize()
 		self._callbackInst = ocSpeech_Callback(self._callback)
 		self._dll.ocSpeech_setCallback(self._handle, self._callbackInst)
@@ -182,7 +182,10 @@ class SynthDriver(SynthDriver):
 			self._player.stop()
 
 	def speak(self, speechSequence):
-		conv = _OcSsmlConverter(self.language, self._rate, self._pitch, self._volume)
+		if self.supportsProsodyOptions:
+			conv = _OcSsmlConverter(self.language)
+		else:
+			conv = _OcSsmlConverter(self.language, self._rate, self._pitch, self._volume)
 		text = conv.convertToXml(speechSequence)
 		# #7495: Calling WaveOutOpen blocks for ~100 ms if called from the callback
 		# when the SSML includes marks.
