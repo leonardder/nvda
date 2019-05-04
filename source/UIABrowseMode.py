@@ -134,37 +134,46 @@ def UIATextAttributeQuicknavIterator(ItemClass,itemType,document,position,direct
 				yield ItemClass(curAttribValues,itemType,document,tempInfo)
 				break
 
-class HeadingUIATextInfoQuickNavItem(browseMode.TextInfoQuickNavItem):
+class HeadingUIATextInfoQuickNavItem(TextAttribUIATextInfoQuickNavItem):
+	attribID=UIAHandler.UIA_StyleIdAttributeId
+	wantedAttribValues={
+		UIAHandler.StyleId_Heading1,
+		UIAHandler.StyleId_Heading2,
+		UIAHandler.StyleId_Heading3,
+		UIAHandler.StyleId_Heading4,
+		UIAHandler.StyleId_Heading5,
+		UIAHandler.StyleId_Heading6,
+		UIAHandler.StyleId_Heading7,
+		UIAHandler.StyleId_Heading8,
+		UIAHandler.StyleId_Heading9,
+	}
 
-	def __init__(self,itemType,document,position,level=0):
-		super(HeadingUIATextInfoQuickNavItem,self).__init__(itemType,document,position)
-		self.level=level
+	@property
+	def level(self):
+		return (self.attribValues[0]-UIAHandler.StyleId_Heading1)+1
 
 	def isChild(self,parent):
 		if not isinstance(parent,HeadingUIATextInfoQuickNavItem):
 			return False
 		return self.level>parent.level
 
+def headingUIATextInfoQuickNavItemFactory(level):
+	if not level:
+		return HeadingUIATextInfoQuickNavItem
+	return type("Heading{level}UIATextInfoQuickNavItem".format(level=level), (HeadingUIATextInfoQuickNavItem,), {
+		"wantedAttribValues": {getattr(UIAHandler,"StyleId_Heading{level}".format(level=level))},
+		"level": level,
+	})
+
 def UIAHeadingQuicknavIterator(itemType,document,position,direction="next"):
-	if position:
-		curPosition=position
-	else:
-		curPosition=document.makeTextInfo(textInfos.POSITION_LAST if direction=="previous" else textInfos.POSITION_FIRST)
-	stop=False
-	firstLoop=True
-	while not stop:
-		tempInfo=curPosition.copy()
-		tempInfo.expand(textInfos.UNIT_CHARACTER)
-		styleIDValue=getUIATextAttributeValueFromRange(tempInfo._rangeObj,UIAHandler.UIA_StyleIdAttributeId,ignoreMixedValues=True)
-		if (UIAHandler.StyleId_Heading1<=styleIDValue<=UIAHandler.StyleId_Heading9):
-			foundLevel=(styleIDValue-UIAHandler.StyleId_Heading1)+1
-			wantedLevel=int(itemType[7:]) if len(itemType)>7 else None
-			if not wantedLevel or wantedLevel==foundLevel: 
-				if not firstLoop or not position:
-					tempInfo.expand(textInfos.UNIT_PARAGRAPH)
-					yield HeadingUIATextInfoQuickNavItem(itemType,document,tempInfo,level=foundLevel)
-		stop=(curPosition.move(textInfos.UNIT_PARAGRAPH,1 if direction=="next" else -1)==0)
-		firstLoop=False
+	wantedLevel=int(itemType[7:]) if len(itemType)>7 else None
+	return UIATextAttributeQuicknavIterator(
+		headingUIATextInfoQuickNavItemFactory(wantedLevel),
+		itemType,
+		document,
+		position,
+		direction
+	)
 
 def UIAControlQuicknavIterator(itemType,document,position,UIACondition,direction="next",itemClass=UIATextRangeQuickNavItem):
 	# A part from the condition given, we must always match on the root of the document so we know when to stop walking
