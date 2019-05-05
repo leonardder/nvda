@@ -14,7 +14,6 @@ from NVDAObjects.behaviors import EditableText
 from comtypes import GUID, COMError, IServiceProvider
 from comtypes.gen.AcrobatAccessLib import IAccID, IGetPDDomNode, IPDDomElement
 from logHandler import log
-from six.moves import xrange
 
 SID_AccID = GUID("{449D454B-1F46-497e-B2B6-3357AED9912B}")
 SID_GetPDDomNode = GUID("{C0A1D5E9-1142-4cf3-B607-82FC3B96A4DF}")
@@ -119,7 +118,7 @@ class AcrobatNode(IAccessible):
 		if val:
 			yield val
 		else:
-			for childNum in xrange(node.GetChildCount()):
+			for childNum in range(node.GetChildCount()):
 				try:
 					subNode = node.GetChild(childNum).QueryInterface(IPDDomElement)
 				except COMError:
@@ -130,7 +129,7 @@ class AcrobatNode(IAccessible):
 
 	def _get_mathMl(self):
 		# There could be other stuff before the math element. Ug.
-		for childNum in xrange(self.pdDomNode.GetChildCount()):
+		for childNum in range(self.pdDomNode.GetChildCount()):
 			try:
 				child = self.pdDomNode.GetChild(childNum).QueryInterface(IPDDomElement)
 			except COMError:

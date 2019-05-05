@@ -17,7 +17,6 @@ import winKernel
 import wave
 import config
 from logHandler import log
-from six.moves import xrange
 
 __all__ = (
 	"WavePlayer", "getOutputDeviceNames", "outputDeviceIDToName", "outputDeviceNameToID",
@@ -279,7 +278,7 @@ class WavePlayer(object):
 
 def _getOutputDevices():
 	caps = WAVEOUTCAPS()
-	for devID in xrange(-1, winmm.waveOutGetNumDevs()):
+	for devID in range(-1, winmm.waveOutGetNumDevs()):
 		try:
 			winmm.waveOutGetDevCapsW(devID, byref(caps), sizeof(caps))
 			yield devID, caps.szPname

@@ -37,7 +37,6 @@ import nvwave
 import treeInterceptorHandler
 import watchdog
 from abc import abstractmethod
-from six.moves import xrange
 
 VBufStorage_findDirection_forward=0
 VBufStorage_findDirection_back=1
@@ -267,7 +266,7 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 		if not text:
 			return ""
 		commandList=XMLFormatting.XMLTextParser().parse(text)
-		for index in xrange(len(commandList)):
+		for index in range(len(commandList)):
 			if isinstance(commandList[index],textInfos.FieldCommand):
 				field=commandList[index].field
 				if isinstance(field,textInfos.ControlField):

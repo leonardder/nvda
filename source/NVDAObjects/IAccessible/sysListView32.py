@@ -23,7 +23,6 @@ import watchdog
 from NVDAObjects.behaviors import RowWithoutCellObjects, RowWithFakeNavigation
 import config
 from locationHelper import RectLTRB
-from six.moves import xrange
 
 #Window messages
 LVM_FIRST=0x1000
@@ -405,7 +404,7 @@ class ListItem(RowWithFakeNavigation, RowWithoutCellObjects, ListItemWithoutColu
 				return self.displayText
 			return name
 		textList = []
-		for col in xrange(1, self.childCount + 1):
+		for col in range(1, self.childCount + 1):
 			content = self._getColumnContent(col)
 			if not content:
 				continue

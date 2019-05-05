@@ -8,7 +8,6 @@ import threading
 import time
 from collections import OrderedDict
 from logHandler import log
-from six.moves import xrange
 
 #Possible actions (single trackers)
 action_tap="tap"
@@ -281,7 +280,7 @@ class TrackerManager(object):
 		"""Queues the given tracker, replacing old trackers with a multiFingered plural action where possible"""
 		#Reverse iterate through the existing queued trackers comparing the given tracker to each of them
 		#as L{emitTrackers} constantly dequeues, the queue only contains trackers newer than multiTouchTimeout, though may contain more if there are still unknown singleTouchTrackers around.
-		for index in xrange(len(self.multiTouchTrackers)):
+		for index in range(len(self.multiTouchTrackers)):
 			index=len(self.multiTouchTrackers)-1-index
 			delayedTracker=self.multiTouchTrackers[index]
 			mergedTracker=self.makeMergedTrackerIfPossible(delayedTracker,tracker)

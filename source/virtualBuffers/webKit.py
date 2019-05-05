@@ -15,7 +15,6 @@ import oleacc
 from logHandler import log
 import textInfos
 import NVDAHelper
-from six.moves import xrange
 
 class WebKit_TextInfo(VirtualBufferTextInfo):
 
@@ -34,7 +33,7 @@ class WebKit_TextInfo(VirtualBufferTextInfo):
 		if not role:
 			role = IAccessibleHandler.IAccessibleRolesToNVDARoles.get(accRole, controlTypes.ROLE_UNKNOWN)
 
-		states = set(IAccessibleHandler.IAccessibleStatesToNVDAStates[x] for x in [1 << y for y in xrange(32)] if int(attrs.get('IAccessible::state_%s' % x, 0)) and x in IAccessibleHandler.IAccessibleStatesToNVDAStates)
+		states = set(IAccessibleHandler.IAccessibleStatesToNVDAStates[x] for x in [1 << y for y in range(32)] if int(attrs.get('IAccessible::state_%s' % x, 0)) and x in IAccessibleHandler.IAccessibleStatesToNVDAStates)
 
 		attrs["role"] = role
 		attrs["states"] = states

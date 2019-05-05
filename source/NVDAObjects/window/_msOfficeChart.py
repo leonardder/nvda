@@ -16,7 +16,6 @@ import colors
 import inputCore
 import re
 from logHandler import log
-from six.moves import xrange
 
 #This file contains chart constants common to Chart Object for Microsoft Office.
 
@@ -531,7 +530,7 @@ class OfficeChart(OfficeChartElementList):
 		except:
 			seriesCount=None
 		if seriesCount:
-			for i in xrange(seriesCount):
+			for i in range(seriesCount):
 				self.addElement( OfficeChartElementSeries(windowHandle=self.windowHandle, officeChartObject = self.officeChartObject , elementID = xlSeries , arg1 = i +1 ) , self) 
 
 		self.addElement( OfficeChartElementCollection(windowHandle=self.windowHandle, officeChartObject = self.officeChartObject ) , self )
@@ -564,7 +563,7 @@ class OfficeChart(OfficeChartElementList):
 			else:
 				# Translators: Indicates the number of series in a chart where there are multiple series.
 				seriesValueString = _( "There are total %d series in this chart" ) %(count)
-				for i in xrange(1, count+1):
+				for i in range(1, count+1):
 					# Translators: Specifies the number and name of a series when listing series in a chart.
 					seriesValueString += ", " + _("series {number} {name}").format(number=i, name=self.officeChartObject.SeriesCollection(i).Name)
 				text += seriesValueString
@@ -621,7 +620,7 @@ class OfficeChartElementCollection(OfficeChartElementList):
 			self.addElement(OfficeChartElementLegend(windowHandle=self.windowHandle,  officeChartObject = officeChartObject ) , self )
 
 			self.legendEntryCount = self.officeChartObject.Legend.LegendEntries().Count
-			for legendEntryIndex in xrange( 1 , self.legendEntryCount  + 1 ) :
+			for legendEntryIndex in range( 1 , self.legendEntryCount  + 1 ) :
 				legendEntry = OfficeChartElementLegendEntry(windowHandle=self.windowHandle,  officeChartObject = self.officeChartObject ,  elementID= xlLegendEntry ,  arg1 = legendEntryIndex , arg2 = self.legendEntryCount ) 
 				legendEntry.eventDriven = False
 				self.addElement ( legendEntry , self )
@@ -650,11 +649,11 @@ class OfficeChartElementSeries(OfficeChartElementList):
 		self.pointsCollection=self.officeChartObject.SeriesCollection(self.seriesIndex).Points()
 		self.pointsCount=self.pointsCollection.Count
 
-		for pointIndex in xrange(1,self.pointsCount +1) :
+		for pointIndex in range(1,self.pointsCount +1) :
 			self.addElement ( OfficeChartElementPoint(windowHandle=self.windowHandle,  officeChartObject = self.officeChartObject ,  elementID= xlSeries, arg1 =self.seriesIndex, arg2 =pointIndex) , self )
 
 		self.trendlinesCount = self.officeChartObject.SeriesCollection(self.seriesIndex).Trendlines().Count
-		for trendlineIndex in xrange( 1 , self.trendlinesCount + 1 ) :
+		for trendlineIndex in range( 1 , self.trendlinesCount + 1 ) :
 			self.addElement ( OfficeChartElementTrendline(windowHandle=self.windowHandle,  officeChartObject = self.officeChartObject ,  elementID= xlTrendline ,  arg1 = self.seriesIndex , arg2 = trendlineIndex ) , self )
 	
 	def _get_name(self):

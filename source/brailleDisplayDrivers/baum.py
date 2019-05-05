@@ -7,18 +7,13 @@
 
 import time
 from collections import OrderedDict
-import sys
-if sys.version.startswith("3"):
-	from io import StringIO
-else:
-	from cStringIO import StringIO
+from io import StringIO
 import braille
 import inputCore
 from logHandler import log
 import brailleInput
 import bdDetect
 import hwIo
-from six.moves import xrange
 
 TIMEOUT = 0.2
 BAUD_RATE = 19200
@@ -105,7 +100,7 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver):
 				self._sendRequest(BAUM_PROTOCOL_ONOFF, True)
 				# Send again in case the display misses the first one.
 				self._sendRequest(BAUM_PROTOCOL_ONOFF, True)
-			for i in xrange(3):
+			for i in range(3):
 				# An expected response hasn't arrived yet, so wait for it.
 				self._dev.waitForRead(TIMEOUT)
 				if self.numCells and self._deviceID:
@@ -243,7 +238,7 @@ class InputGesture(braille.BrailleDisplayGesture, brailleInput.BrailleInputGestu
 				self.dots = groupKeysDown >> 8
 				self.space = groupKeysDown & 0x3
 			if group == BAUM_ROUTING_KEYS:
-				for index in xrange(braille.handler.display.numCells):
+				for index in range(braille.handler.display.numCells):
 					if groupKeysDown & (1 << index):
 						self.routingIndex = index
 						names.append("routing")

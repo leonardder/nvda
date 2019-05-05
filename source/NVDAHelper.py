@@ -26,7 +26,6 @@ import globalVars
 from logHandler import log
 import time
 import globalVars
-from six.moves import xrange
 
 versionedLibPath='lib'
 if os.environ.get('PROCESSOR_ARCHITEW6432') == 'ARM64':
@@ -287,7 +286,7 @@ def handleInputConversionModeUpdate(oldFlags,newFlags,lcid):
 		if msg:
 			textList.append(msg)
 	else:
-		for x in xrange(32):
+		for x in range(32):
 			x=2**x
 			msgs=inputConversionModeMessages.get(x)
 			if not msgs: continue

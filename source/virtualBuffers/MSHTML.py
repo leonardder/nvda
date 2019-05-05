@@ -21,7 +21,6 @@ import api
 import aria
 import config
 import watchdog
-from six.moves import xrange
 
 FORMATSTATE_INSERTED=1
 FORMATSTATE_DELETED=2
@@ -71,7 +70,7 @@ class MSHTMLTextInfo(VirtualBufferTextInfo):
 		roleText=attrs.get('HTMLAttrib::aria-roledescription')
 		if roleText:
 			attrs['roleText']=roleText
-		states=set(IAccessibleHandler.IAccessibleStatesToNVDAStates[x] for x in [1<<y for y in xrange(32)] if int(attrs.get('IAccessible::state_%s'%x,0)) and x in IAccessibleHandler.IAccessibleStatesToNVDAStates)
+		states=set(IAccessibleHandler.IAccessibleStatesToNVDAStates[x] for x in [1<<y for y in range(32)] if int(attrs.get('IAccessible::state_%s'%x,0)) and x in IAccessibleHandler.IAccessibleStatesToNVDAStates)
 		if attrs.get('HTMLAttrib::longdesc'):
 			states.add(controlTypes.STATE_HASLONGDESC)
 		#IE exposes destination anchors as links, this is wrong

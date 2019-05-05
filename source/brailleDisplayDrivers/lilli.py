@@ -9,7 +9,6 @@ from ctypes import *
 import inputCore
 import wx
 import braille
-from six.moves import xrange
 
 try:
 	lilliDll=windll.LoadLibrary("brailleDisplayDrivers\\lilli.dll")
@@ -51,7 +50,7 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver):
 	def  __init__(self):
 		global lilliCellsMap
 		super(BrailleDisplayDriver, self).__init__()
-		lilliCellsMap=[convertLilliCells(x) for x in xrange(256)]
+		lilliCellsMap=[convertLilliCells(x) for x in range(256)]
 		if (lilliDll.Init408USB()):
 			self._keyCheckTimer = wx.PyTimer(self._handleKeyPresses)
 			self._keyCheckTimer.Start(KEY_CHECK_INTERVAL)

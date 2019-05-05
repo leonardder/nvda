@@ -29,7 +29,6 @@ import mouseHandler
 import controlTypes
 import keyboardHandler
 import core
-from six.moves import xrange
 
 MAX_WINEVENTS=500
 MAX_WINEVENTS_PER_THREAD=10
@@ -125,7 +124,7 @@ class OrderedWinEventLimiter(object):
 		e=self._eventHeap
 		self._eventHeap=[]
 		r=[]
-		for count in xrange(len(e)):
+		for count in range(len(e)):
 			event=heapq.heappop(e)[1:-1]
 			r.append(event)
 		return r
@@ -992,7 +991,7 @@ def getRecursiveTextFromIAccessibleTextObject(obj,startOffset=0,endOffset=-1):
 	except:
 		return text
 	textList=[]
-	for i in xrange(len(text)):
+	for i in range(len(text)):
 		t=text[i]
 		if ord(t)==0xFFFC:
 			try:

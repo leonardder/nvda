@@ -20,7 +20,6 @@ import globalCommands
 import scriptHandler
 import struct
 import serial
-from six.moves import xrange
 
 #Control Flow
 STX = 0x02 #Start of Text
@@ -78,7 +77,7 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver, ScriptableObject):
 	def initTable(self):
 		"""do not use braille builtin table"""
 		table = []
-		for i in xrange(0, self.numCells): table +=[1]
+		for i in range(0, self.numCells): table +=[1]
 		self._dev.write(brl_out(512+self._offsetHorizontal, table))
 
 	def __init__(self, port):

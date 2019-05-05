@@ -9,15 +9,11 @@
 import itertools
 import ctypes
 from ctypes.wintypes import BOOL, WCHAR, HWND, DWORD, ULONG, WORD, USHORT
-try:
-	import _winreg as winreg # Python 2.7 import
-except ImportError:
-	import winreg # Python 3 import
+import winreg
 import winKernel
 from winKernel import SYSTEMTIME
 import config
 from logHandler import log
-from six.moves import xrange
 
 def ValidHandle(value):
 	if value == 0:
@@ -141,7 +137,7 @@ def listComPorts(onlyAvailable=True):
 	buf = ctypes.create_unicode_buffer(1024)
 	g_hdi = SetupDiGetClassDevs(ctypes.byref(GUID_CLASS_COMPORT), None, NULL, flags)
 	try:
-		for dwIndex in xrange(256):
+		for dwIndex in range(256):
 			entry = {}
 			did = SP_DEVICE_INTERFACE_DATA()
 			did.cbSize = ctypes.sizeof(did)
@@ -351,7 +347,7 @@ def listUsbDevices(onlyAvailable=True):
 	buf = ctypes.create_unicode_buffer(1024)
 	g_hdi = SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, None, NULL, flags)
 	try:
-		for dwIndex in xrange(256):
+		for dwIndex in range(256):
 			did = SP_DEVICE_INTERFACE_DATA()
 			did.cbSize = ctypes.sizeof(did)
 
@@ -498,7 +494,7 @@ def listHidDevices(onlyAvailable=True):
 	buf = ctypes.create_unicode_buffer(1024)
 	g_hdi = SetupDiGetClassDevs(_hidGuid, None, NULL, flags)
 	try:
-		for dwIndex in xrange(256):
+		for dwIndex in range(256):
 			did = SP_DEVICE_INTERFACE_DATA()
 			did.cbSize = ctypes.sizeof(did)
 

@@ -20,7 +20,6 @@ import UIAHandler
 from UIABrowseMode import UIABrowseModeDocument, UIABrowseModeDocumentTextInfo, UIATextRangeQuickNavItem,UIAControlQuicknavIterator
 from UIAUtils import *
 from . import UIA, UIATextInfo
-from six.moves import xrange
 
 def splitUIAElementAttribs(attribsString):
 	"""Split an UIA Element attributes string into a dict of attribute keys and values.
@@ -213,7 +212,7 @@ class EdgeTextInfo(UIATextInfo):
 		startCount=0
 		lastStartIndex=None
 		numFields=len(fields)
-		for index in xrange(numFields-1,-1,-1):
+		for index in range(numFields-1,-1,-1):
 			field=fields[index]
 			if isinstance(field,str):
 				break
@@ -225,7 +224,7 @@ class EdgeTextInfo(UIATextInfo):
 		# Remove any content from fields with a content attribute
 		numFields=len(fields)
 		curField=None
-		for index in xrange(numFields-1,-1,-1):
+		for index in range(numFields-1,-1,-1):
 			field=fields[index]
 			if not curField and isinstance(field,textInfos.FieldCommand) and field.command=="controlEnd" and field.field.get('content'):
 				curField=field.field

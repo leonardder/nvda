@@ -34,7 +34,6 @@ from NVDAObjects.IAccessible.MSHTML import MSHTML
 from NVDAObjects.behaviors import RowWithFakeNavigation, Dialog
 from NVDAObjects.UIA import UIA
 from NVDAObjects.UIA.wordDocument import WordDocument as UIAWordDocument
-from six.moves import xrange
 
 PR_LAST_VERB_EXECUTED=0x10810003
 VERB_REPLYTOSENDER=102
@@ -504,7 +503,7 @@ class UIAGridRow(RowWithFakeNavigation,UIA):
 			# This is unexpected here.
 			log.debugWarning("Unable to get relevant children for UIAGridRow", stack_info=True)
 			return super(UIAGridRow, self).name
-		for index in xrange(cachedChildren.length):
+		for index in range(cachedChildren.length):
 			e=cachedChildren.getElement(index)
 			UIAControlType=e.cachedControlType
 			UIAClassName=e.cachedClassName
@@ -534,7 +533,7 @@ class UIAGridRow(RowWithFakeNavigation,UIA):
 				columnHeaderItems=None
 			if columnHeaderItems:
 				columnHeaderItems=columnHeaderItems.QueryInterface(UIAHandler.IUIAutomationElementArray)
-				for index in xrange(columnHeaderItems.length):
+				for index in range(columnHeaderItems.length):
 					columnHeaderItem=columnHeaderItems.getElement(index)
 					columnHeaderTextList.append(columnHeaderItem.currentName)
 			columnHeaderText=" ".join(columnHeaderTextList)

@@ -40,7 +40,6 @@ import winKernel
 import extensionPoints
 from . import profileUpgrader
 from .configSpec import confspec
-from six.moves import xrange
 
 #: True if NVDA is running as a Windows Store Desktop Bridge application
 isAppX=False
@@ -622,7 +621,7 @@ class ConfigManager(object):
 			self.saveProfileTriggers()
 		# Check if this profile was active.
 		delProfile = None
-		for index in xrange(len(self.profiles) - 1, -1, -1):
+		for index in range(len(self.profiles) - 1, -1, -1):
 			profile = self.profiles[index]
 			if profile.name == name:
 				# Deactivate it.

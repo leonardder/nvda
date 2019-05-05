@@ -5,15 +5,11 @@
 #See the file COPYING for more details.
 
 import types
-try:
-	from Queue import Queue # Python 2.7 import
-except ImportError:
-	from queue import Queue # Python 3 import
+from queue import Queue
 import globalVars
 from logHandler import log
 import watchdog
 import core
-from six.moves import xrange
 
 eventQueue=Queue()
 eventQueue.__name__="eventQueue"
@@ -46,7 +42,7 @@ def isRunningGenerators():
 	log.debug("generators running: %s"%res)
 
 def flushQueue(queue):
-	for count in xrange(queue.qsize()+1):
+	for count in range(queue.qsize()+1):
 		if not queue.empty():
 			(func,args,kwargs)=queue.get_nowait()
 			watchdog.alive()

@@ -25,7 +25,6 @@ from logHandler import log
 import addonHandler
 import easeOfAccess
 import COMRegistrationFixes
-from six.moves import xrange
 
 _wsh=None
 def _getWSH():
@@ -357,7 +356,7 @@ def tryRemoveFile(path,numRetries=6,retryInterval=0.5,rebootOK=False):
 		os.rename(path,tempPath)
 	except (WindowsError,IOError):
 		raise RetriableFailure("Failed to rename file %s before  remove"%path)
-	for count in xrange(numRetries):
+	for count in range(numRetries):
 		try:
 			if os.path.isdir(tempPath):
 				shutil.rmtree(tempPath)

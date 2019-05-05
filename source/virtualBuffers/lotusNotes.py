@@ -14,13 +14,12 @@ import oleacc
 from logHandler import log
 import textInfos
 from virtualBuffers import VirtualBufferTextInfo
-from six.moves import xrange
 
 class LotusNotesRichText_TextInfo(VirtualBufferTextInfo):
 
 	def _normalizeControlField(self,attrs):
 		role=controlTypes.ROLE_STATICTEXT
-		states=set(IAccessibleHandler.IAccessibleStatesToNVDAStates[x] for x in [1<<y for y in xrange(32)] if int(attrs.get('IAccessible::state_%s'%x,0)) and x in IAccessibleHandler.IAccessibleStatesToNVDAStates)
+		states=set(IAccessibleHandler.IAccessibleStatesToNVDAStates[x] for x in [1<<y for y in range(32)] if int(attrs.get('IAccessible::state_%s'%x,0)) and x in IAccessibleHandler.IAccessibleStatesToNVDAStates)
 		if controlTypes.STATE_LINKED in states:
 			role=controlTypes.ROLE_LINK
 		attrs['role']=role

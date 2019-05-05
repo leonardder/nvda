@@ -12,7 +12,6 @@ from logHandler import log
 import brailleInput
 import bdDetect
 import hwIo
-from six.moves import xrange
 
 TIMEOUT = 0.2
 BAUD_RATE = 115200
@@ -104,7 +103,7 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver):
 			# The Brailliant can fail to init if you try immediately after connecting.
 			time.sleep(DELAY_AFTER_CONNECT)
 			# Sometimes, a few attempts are needed to init successfully.
-			for attempt in xrange(INIT_ATTEMPTS):
+			for attempt in range(INIT_ATTEMPTS):
 				if attempt > 0: # Not the first attempt
 					time.sleep(INIT_RETRY_DELAY) # Delay before next attempt.
 				self._initAttempt()

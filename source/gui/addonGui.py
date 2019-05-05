@@ -20,7 +20,6 @@ import buildVersion
 from . import guiHelper
 from . import nvdaControls
 from .dpiScalingHelper import DpiScalingHelperMixin
-from six.moves import xrange
 
 def promptUserForRestart():
 	# Translators: A message asking the user if they wish to restart NVDA as addons have been added, enabled/disabled or removed.

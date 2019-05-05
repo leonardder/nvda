@@ -29,7 +29,6 @@ import tones
 import core
 from contextlib import contextmanager
 import threading
-from six.moves import xrange
 
 ignoreInjected=False
 
@@ -213,7 +212,7 @@ def internal_keyDownEvent(vkCode,scanCode,extended,injected):
 			)
 		):
 			keyStates=(ctypes.c_byte*256)()
-			for k in xrange(256):
+			for k in range(256):
 				keyStates[k]=ctypes.windll.user32.GetKeyState(k)
 			charBuf=ctypes.create_unicode_buffer(5)
 			hkl=ctypes.windll.user32.GetKeyboardLayout(focus.windowThreadID)

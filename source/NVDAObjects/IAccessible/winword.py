@@ -21,7 +21,6 @@ from displayModel import EditableTextDisplayModelTextInfo
 from NVDAObjects.window import DisplayModelEditableText
 from ..behaviors import EditableTextWithoutAutoSelectDetection
 from NVDAObjects.window.winword import *
-from six.moves import xrange
 
 class WordDocument(IAccessible,EditableTextWithoutAutoSelectDetection,WordDocument):
  
@@ -64,7 +63,7 @@ class WordDocument(IAccessible,EditableTextWithoutAutoSelectDetection,WordDocume
 	def populateHeaderCellTrackerFromHeaderRows(self,headerCellTracker,table):
 		rows=table.rows
 		numHeaderRows=0
-		for rowIndex in xrange(rows.count): 
+		for rowIndex in range(rows.count): 
 			try:
 				row=rows.item(rowIndex+1)
 			except COMError:
@@ -176,7 +175,7 @@ class WordDocument(IAccessible,EditableTextWithoutAutoSelectDetection,WordDocume
 		for info in headerCellTracker.iterPossibleHeaderCellInfosFor(rowNumber,columnNumber,columnHeader=columnHeader):
 			textList=[]
 			if columnHeader:
-				for headerRowNumber in xrange(info.rowNumber,info.rowNumber+info.rowSpan): 
+				for headerRowNumber in range(info.rowNumber,info.rowNumber+info.rowSpan): 
 					tempColumnNumber=columnNumber
 					while tempColumnNumber>=1:
 						try:
@@ -187,7 +186,7 @@ class WordDocument(IAccessible,EditableTextWithoutAutoSelectDetection,WordDocume
 						break
 					textList.append(headerCell.range.text)
 			else:
-				for headerColumnNumber in xrange(info.columnNumber,info.columnNumber+info.colSpan): 
+				for headerColumnNumber in range(info.columnNumber,info.columnNumber+info.colSpan): 
 					tempRowNumber=rowNumber
 					while tempRowNumber>=1:
 						try:

@@ -19,7 +19,6 @@ from NVDAObjects import NVDAObject, NVDAObjectTextInfo
 from . import IA2TextTextInfo, IAccessible
 from compoundDocuments import CompoundTextInfo
 from locationHelper import RectLTWH
-from six.moves import xrange
 
 class FakeEmbeddingTextInfo(textInfos.offsets.OffsetsTextInfo):
 
