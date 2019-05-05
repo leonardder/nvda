@@ -23,15 +23,9 @@ import os
 import inspect
 import threading
 import time
-try:
-	import pickle
-except ImportError:
-	import cPickle as pickle
-try:
-	from urllib import urlopen, urlencode
-except:
-	from urllib.request import urlopen
-	from urllib.parse import urlencode
+import pickle
+from urllib.request import urlopen
+from urllib.parse import urlencode
 import tempfile
 import hashlib
 import ctypes.wintypes

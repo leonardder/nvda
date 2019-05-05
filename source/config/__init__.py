@@ -12,18 +12,12 @@ For the latter two actions, one can perform actions prior to and/or after they t
 """ 
 
 import globalVars
-try:
-	import _winreg as winreg # Python 2.7 import
-except ImportError:
-	import winreg # Python 3 import
+import winreg
 import ctypes
 import ctypes.wintypes
 import os
 import sys
-if sys.version.startswith("3"):
-	from io import StringIO
-else:
-	from cStringIO import StringIO
+from io import StringIO
 import itertools
 import contextlib
 from copy import deepcopy

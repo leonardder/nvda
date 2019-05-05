@@ -4,12 +4,7 @@
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
 
-# #7105: no cStringIO in Python 3, as io hierarchy replaces this and StringIO is now a C implementation.
-import sys
-if sys.version.startswith("3"):
-	from io import StringIO
-else:
-	from cStringIO import StringIO
+from io import StringIO
 from configobj import ConfigObj
 
 #: The version of the schema outlined in this file. Increment this when modifying the schema and 

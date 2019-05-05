@@ -5,10 +5,7 @@
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
 
-try:
-	import Queue as queue # Python 2.7 import
-except ImportError:
-	import queue # Python 3 import
+import queue
 from ctypes import *
 from ctypes.wintypes import *
 import time

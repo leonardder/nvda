@@ -11,15 +11,9 @@ import os
 import sys
 from collections import OrderedDict
 import ctypes
-try:
-	import _winreg as winreg # Python 2.7 import
-except ImportError:
-	import winreg # Python 3 import
+import winreg
 import wave
-try:
-	import io as cStringIO
-except:
-	import cStringIO
+import io
 from synthDriverHandler import SynthDriver, VoiceInfo
 from logHandler import log
 import config
@@ -207,7 +201,7 @@ class SynthDriver(SynthDriver):
 			self._processQueue()
 			return
 		# This gets called in a background thread.
-		stream = cStringIO.BytesIO(ctypes.string_at(bytes, len))
+		stream = io.BytesIO(ctypes.string_at(bytes, len))
 		wav = wave.open(stream, "r")
 		self._maybeInitPlayer(wav)
 		data = wav.readframes(wav.getnframes())
