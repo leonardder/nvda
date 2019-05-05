@@ -1257,7 +1257,7 @@ the NVDAObject for IAccessible
 		# For our purposes, we can treat both S_OK and S_FALSE as success.
 		if res!=S_OK and res!=S_FALSE:
 			raise COMError(res,None,None)
-		return numItemsFetched.value if numItemsFetched.value<=maxCount else sys.maxint
+		return numItemsFetched.value if numItemsFetched.value<=maxCount else sys.maxsize
 
 	def getSelectedItemsCount(self,maxCount):
 		# To fetch the number of selected items, we first try MSAA's accSelection, but if that fails in any way, we fall back to using IAccessibleTable2's nSelectedCells, if we are on an IAccessible2 table.
