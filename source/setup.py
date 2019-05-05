@@ -8,7 +8,7 @@
 import os
 import copy
 import gettext
-gettext.install("nvda", unicode=True)
+gettext.install("nvda")
 from distutils.core import setup
 import py2exe as py2exeModule
 from glob import glob
