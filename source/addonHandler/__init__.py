@@ -14,7 +14,8 @@ import itertools
 import collections
 import pkgutil
 import shutil
-from six.moves import cStringIO as StringIO, cPickle
+from six.moves import cStringIO as StringIO
+import pickle
 from six import string_types
 import globalVars
 import zipfile
@@ -47,7 +48,7 @@ def loadState():
 	global state
 	statePath=os.path.join(globalVars.appArgs.configPath,stateFilename)
 	try:
-		state = cPickle.load(file(statePath, "r"))
+		state = pickle.load(file(statePath, "r"))
 		if "disabledAddons" not in state:
 			state["disabledAddons"] = set()
 		if "pendingDisableSet" not in state:
@@ -67,7 +68,7 @@ def loadState():
 def saveState():
 	statePath=os.path.join(globalVars.appArgs.configPath,stateFilename)
 	try:
-		cPickle.dump(state, file(statePath, "wb"))
+		pickle.dump(state, file(statePath, "wb"))
 	except:
 		log.debugWarning("Error saving state", exc_info=True)
 
