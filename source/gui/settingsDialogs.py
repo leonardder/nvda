@@ -2514,7 +2514,7 @@ class BrailleDisplaySelectionDialog(SettingsDialog):
 		if displayName != "auto":
 			displayCls = braille._getDisplayDriver(displayName)
 			try:
-				self.possiblePorts.extend(displayCls.getPossiblePorts().iteritems())
+				self.possiblePorts.extend(displayCls.getPossiblePorts().items())
 			except NotImplementedError:
 				pass
 		if self.possiblePorts:
@@ -2833,7 +2833,7 @@ class SpeechSymbolsDialog(SettingsDialog):
 
 	def makeSettings(self, settingsSizer):
 		self.filteredSymbols = self.symbols = [
-			copy.copy(symbol) for symbol in self.symbolProcessor.computedSymbols.itervalues()
+			copy.copy(symbol) for symbol in self.symbolProcessor.computedSymbols.values()
 		]
 		self.pendingRemovals = {}
 

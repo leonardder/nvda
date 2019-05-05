@@ -562,7 +562,7 @@ class InputGesture(braille.BrailleDisplayGesture, brailleInput.BrailleInputGestu
 				self.routingIndex = (groupKeysDown & 0xff)-1
 				names.append("doubleRouting" if groupKeysDown>>8 ==ord(EB_KEY_INTERACTIVE_DOUBLE_CLICK) else "routing")
 			if group == EB_KEY_COMMAND:
-				for key, keyName in display.keys.iteritems():
+				for key, keyName in display.keys.items():
 					if groupKeysDown & key:
 						# This key is pressed
 						names.append(keyName)
