@@ -11,7 +11,7 @@ import time
 import ui
 import eventHandler
 import controlTypes
-import excel 
+from . import excel
 from logHandler import log
 from . import Window
 import scriptHandler
