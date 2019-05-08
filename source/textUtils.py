@@ -190,21 +190,3 @@ class EncodingAwareString(Sequence, str):
 		if isinstance(chars, byteTypes):
 			return EncodingAwareString(self.encoded.strip(chars), self.encoding, self.errors)
 		return EncodingAwareString(self.decoded.strip(chars), self.encoding, self.errors)
-
-def getEncodingAwareString(value, encoding, errors="replace"):
-	"""Creates a string that is encoding aware if necessary.
-	The UTF_32_le encoding will result in a str object,
-	as 1 index corresponds to 1 code point.
-	Other encodings will result in a L{EncodeAwareString} object.
-	"""
-	encoding = encodings.normalize_encoding(encoding)
-	if encoding == defaultStringEncoding:
-		stringType = str
-	else:
-		stringType = EncodingAwareString
-	if isinstance(value, byteTypes):
-		return stringType(value, encoding, errors)
-	elif encoding == defaultStringEncoding:
-		return stringType(value)
-	else:
-		return EncodingAwareString(value, encoding, errors)
