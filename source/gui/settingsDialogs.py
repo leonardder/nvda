@@ -2553,12 +2553,14 @@ class BrailleDisplaySelectionDialog(SettingsDialog):
 		display = self.displayNames[self.displayList.GetSelection()]
 		if display not in config.conf["braille"]:
 			config.conf["braille"][display] = {}
+		port = None
 		if self.possiblePorts:
 			port = self.possiblePorts[self.portsList.GetSelection()][0]
-			config.conf["braille"][display]["port"] = port
 		if not braille.handler.setDisplayByName(display):
 			gui.messageBox(_("Could not load the %s display.")%display, _("Braille Display Error"), wx.OK|wx.ICON_WARNING, self)
 			return 
+		if port:
+			config.conf["braille"][display]["port"] = port
 
 		if self.IsModal():
 			# Hack: we need to update the display in our parent window before closing.
