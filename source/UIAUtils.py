@@ -7,6 +7,7 @@ import operator
 from comtypes import COMError
 import ctypes
 import UIAHandler
+from logHandler import log
 
 def createUIAMultiPropertyCondition(*dicts):
 	"""
@@ -97,7 +98,7 @@ def getUIATextAttributeValueFromRange(range,attrib,ignoreMixedValues=False):
 			raise UIAMixedAttributeError
 	return val
 
-def iterUIARangeByUnit(rangeObj,unit,reverse=False):
+def iterUIARangeByUnit(rangeObj, moveUnit, reverse=False, expandUnit=None):
 	"""
 	Splits a given UI Automation text range into smaller text ranges the size of the given unit and yields them.
 	@param rangeObj: the UI Automation text range to split.
@@ -115,8 +116,16 @@ def iterUIARangeByUnit(rangeObj,unit,reverse=False):
 	tempRange=rangeObj.clone()
 	tempRange.MoveEndpointByRange(Endpoint_relativeEnd,rangeObj,Endpoint_relativeStart)
 	endRange=tempRange.Clone()
-	while relativeGTOperator(endRange.Move(unit,minRelativeDistance),0):
-		tempRange.MoveEndpointByRange(Endpoint_relativeEnd,endRange,Endpoint_relativeStart)
+	while relativeGTOperator(endRange.Move(moveUnit,minRelativeDistance),0):
+		moveEndpointByRange = True
+		if expandUnit:
+			tempRange.MoveEndpointByUnit(Endpoint_relativeEnd,expandUnit, minRelativeDistance)
+			tempRange.ExpandToEnclosingUnit(expandUnit)
+			moveEndpointByRange = relativeLTOperator(tempRange.CompareEndpoints(Endpoint_relativeEnd,endRange,Endpoint_relativeStart),0)
+		if moveEndpointByRange:
+			tempRange.MoveEndpointByRange(Endpoint_relativeEnd,endRange,Endpoint_relativeStart)
+		else:
+			endRange.MoveEndpointByRange(Endpoint_relativeStart,tempRange,Endpoint_relativeEnd		)
 		pastEnd=relativeGTOperator(tempRange.CompareEndpoints(Endpoint_relativeEnd,rangeObj,Endpoint_relativeEnd),0)
 		if pastEnd:
 			tempRange.MoveEndpointByRange(Endpoint_relativeEnd,rangeObj,Endpoint_relativeEnd)

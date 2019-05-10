@@ -145,7 +145,7 @@ class HeadingUIATextInfoQuickNavItem(TextAttribUIATextInfoQuickNavItem):
 			return False
 		return self.level>parent.level
 
-def UIATextAttributeQuicknavIterator(ItemClass,itemType,document,position,direction="next"):
+def UIATextAttributeQuicknavIterator(ItemClass,itemType,document,position,direction="next",expandUnit=None):
 	reverse=(direction=="previous")
 	entireDocument=document.makeTextInfo(textInfos.POSITION_ALL)
 	if not position:
@@ -157,7 +157,7 @@ def UIATextAttributeQuicknavIterator(ItemClass,itemType,document,position,direct
 		else:
 			searchArea.setEndPoint(entireDocument,"endToEnd")
 	firstLoop=True
-	for subrange in iterUIARangeByUnit(searchArea._rangeObj,UIAHandler.TextUnit_Format,reverse=reverse):
+	for subrange in iterUIARangeByUnit(searchArea._rangeObj,UIAHandler.TextUnit_Format,reverse=reverse,expandUnit=expandUnit):
 		if firstLoop:
 			firstLoop=False
 			if position and not reverse:
@@ -358,7 +358,7 @@ class UIABrowseModeDocument(UIADocumentWithTableNavigation,browseMode.BrowseMode
 
 	def _iterNodesByType(self,nodeType,direction="next",pos=None):
 		if nodeType.startswith("heading"):
-			return UIATextAttributeQuicknavIterator(HeadingUIATextInfoQuickNavItem,nodeType,self,pos,direction=direction)
+			return UIATextAttributeQuicknavIterator(HeadingUIATextInfoQuickNavItem,nodeType,self,pos,direction=direction,expandUnit=UIAHandler.TextUnit_Paragraph)
 		elif nodeType=="error":
 			return UIATextAttributeQuicknavIterator(ErrorUIATextInfoQuickNavItem,nodeType,self,pos,direction=direction)
 		elif nodeType=="link":
