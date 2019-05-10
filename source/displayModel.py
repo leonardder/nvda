@@ -334,29 +334,41 @@ class DisplayModelTextInfo(OffsetsTextInfo):
 				lastEndOffset=endOffset
 
 	def _getFieldsInRange(self,start,end):
-		storyFields=self._storyFieldsAndRects[0]
+		storyFields = self._storyFieldsAndRects[0]
 		if not storyFields:
 			return []
-		#Strip  unwanted commands and text from the start and the end to honour the requested offsets
-		lastEndOffset=0
-		startIndex=endIndex=relStart=relEnd=None
+		# Strip  unwanted commands and text from the start and the end to honour the requested offsets
+		lastEndOffset = 0
+		startIndex = endIndex= relStart= relEnd = None
+		# Walk through all the story fields to calculate offsets
 		for index in xrange(len(storyFields)):
 			item=storyFields[index]
-			if isinstance(item,basestring):
-				endOffset=lastEndOffset+len(item)
-				if lastEndOffset<=start<endOffset:
+			if isinstance(item, basestring):
+				# Calculate the end offset of this text chunk.
+				endOffset = lastEndOffset+len(item)
+				if lastEndOffset <= start < endOffset:
+					# The requested start offset falls within this chunk.
+					# Therefore, the startIndex should be the index belonging to the foregoing formatField.
 					startIndex=index-1
-					relStart=start-lastEndOffset
-				if lastEndOffset<end<=endOffset:
-					endIndex=index+1
-					relEnd=end-lastEndOffset
-				lastEndOffset=endOffset
+					# Calculate the requested start offset relative to this chunk.
+					relStart = start-lastEndOffset
+				# An endOffset can't be set when there is not yet a startOffset
+				if startIndex and lastEndOffset < end <= endOffset:
+					# The requested end offset falls within this chunk.
+					# Therefore, the endIndex should be the index belonging to the subsequent formatField.
+					endIndex = index+1
+					# Calculate the requested end offset relative to this chunk.
+					relEnd = end - lastEndOffset
+				# Prepare for the next loop
+				lastEndOffset = endOffset
 		if startIndex is None:
 			return []
 		if endIndex is None:
-			endIndex=len(storyFields)
-		commandList=storyFields[startIndex:endIndex]
-		if (endIndex-startIndex)==2 and relStart is not None and relEnd is not None:
+			endIndex = startIndex + 2 if start == end else len(storyFields)
+		commandList = storyFields[startIndex:endIndex]
+		if not commandList:
+			return []
+		if (endIndex - startIndex) == 2 and relStart is not None and relEnd is not None:
 			commandList[1]=commandList[1][relStart:relEnd]
 		else:
 			if relStart is not None:
@@ -428,7 +440,10 @@ class DisplayModelTextInfo(OffsetsTextInfo):
 		rects=self._storyFieldsAndRects[1]
 		if not rects or offset>=len(rects):
 			raise LookupError
-		return rects[offset].toPhysical(self.obj.windowHandle).toLTWH()
+		# Find the window handle of the text chunk this offset belongs to.
+		command = self._getFieldsInRange(offset, offset)[0]
+		hwnd = command.field.get("hwnd", self.obj.windowHandle)
+		return rects[offset].toPhysical(hwnd).toLTWH()
 
 	def _getNVDAObjectFromOffset(self,offset):
 		try:
