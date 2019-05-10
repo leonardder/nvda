@@ -135,9 +135,6 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 
 	allowMoveToOffsetPastEnd=False #: no need for end insertion point as vbuf is not editable. 
 
-	UNIT_CONTROLFIELD = "controlField"
-	UNIT_FORMATFIELD = "formatField"
-
 	def _getControlFieldAttribs(self,  docHandle, id):
 		info = self.copy()
 		info.expand(textInfos.UNIT_CHARACTER)
@@ -359,7 +356,7 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 		return self._getFieldIdentifierFromOffset( self._startOffset)
 
 	def _getUnitOffsets(self, unit, offset):
-		if unit == self.UNIT_CONTROLFIELD:
+		if unit == textInfos.UNIT_CONTROLFIELD:
 			startOffset=ctypes.c_int()
 			endOffset=ctypes.c_int()
 			docHandle=ctypes.c_int()
@@ -367,7 +364,7 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 			node=VBufRemote_nodeHandle_t()
 			NVDAHelper.localLib.VBuf_locateControlFieldNodeAtOffset(self.obj.VBufHandle,offset,ctypes.byref(startOffset),ctypes.byref(endOffset),ctypes.byref(docHandle),ctypes.byref(ID),ctypes.byref(node))
 			return startOffset.value,endOffset.value
-		elif unit == self.UNIT_FORMATFIELD:
+		elif unit == textInfos.UNIT_FORMATFIELD:
 			startOffset=ctypes.c_int()
 			endOffset=ctypes.c_int()
 			node=VBufRemote_nodeHandle_t()

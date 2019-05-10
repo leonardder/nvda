@@ -24,6 +24,7 @@ import winUser
 import eventHandler
 from logHandler import log
 import UIAUtils
+import textInfos
 
 from comtypes.gen.UIAutomationClient import *
 
@@ -77,11 +78,13 @@ UIADialogClassNames=[
 ]
 
 NVDAUnitsToUIAUnits={
-	"character":TextUnit_Character,
-	"word":TextUnit_Word,
-	"line":TextUnit_Line,
-	"paragraph":TextUnit_Paragraph,
-	"readingChunk":TextUnit_Line,
+	textInfos.UNIT_CHARACTER: TextUnit_Character,
+	textInfos.UNIT_WORD: TextUnit_Word,
+	textInfos.UNIT_LINE: TextUnit_Line,
+	textInfos.UNIT_PARAGRAPH: TextUnit_Paragraph,
+	textInfos.UNIT_READINGCHUNK: TextUnit_Line,
+	textInfos.UNIT_FORMATFIELD: TextUnit_Format,
+	textInfos.UNIT_STORY: TextUnit_Document,
 }
 
 UIAControlTypesToNVDARoles={
