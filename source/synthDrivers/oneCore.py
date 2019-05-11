@@ -224,7 +224,7 @@ class SynthDriver(SynthDriver):
 			self._pitch = pitch
 			return
 		rawPitch = self._percentToParam(pitch, self.MIN_PITCH, self.MAX_PITCH)
-		self._queuedSpeech.append((self._dll.ocSpeech_setPitch, rawPitch))
+		self._dll.ocSpeech_setPitch(rawPitch)
 
 	def _get_volume(self):
 		if not self.supportsProsodyOptions:
@@ -237,7 +237,7 @@ class SynthDriver(SynthDriver):
 			self._volume = volume
 			return
 		rawVolume = volume / 100.0
-		self._queuedSpeech.append((self._dll.ocSpeech_setVolume, rawVolume))
+		self._dll.ocSpeech_setVolume(rawVolume)
 
 	def _get_rate(self):
 		if not self.supportsProsodyOptions:
@@ -252,7 +252,7 @@ class SynthDriver(SynthDriver):
 			return
 		maxRate = self.BOOSTED_MAX_RATE if self._rateBoost else self.DEFAULT_MAX_RATE
 		rawRate = self._percentToParam(rate, self.MIN_RATE, maxRate)
-		self._queuedSpeech.append((self._dll.ocSpeech_setRate, rawRate))
+		self._dll.ocSpeech_setRate(rawRate)
 
 	_rateBoost = False
 
@@ -273,15 +273,8 @@ class SynthDriver(SynthDriver):
 			# so by the time this is done, there might be something queued.
 			log.debug("Calling idle on audio player")
 			self._player.idle()
-		while self._queuedSpeech:
+		if self._queuedSpeech:
 			item = self._queuedSpeech.pop(0)
-			if isinstance(item, tuple):
-				# Parameter change.
-				# Note that, if prosody otions aren't supported, this code will never be executed.
-				func, value = item
-				value = ctypes.c_double(value)
-				func(self._handle, value)
-				continue
 			self._wasCancelled = False
 			log.debug("Begin processing speech")
 			self._isProcessing = True
