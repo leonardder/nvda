@@ -127,8 +127,11 @@ class SynthDriver(SynthDriver):
 		self._dll.ocSpeech_getCurrentVoiceLanguage.restype = ctypes.c_wchar_p
 		if self.supportsProsodyOptions:
 			self._dll.ocSpeech_getPitch.restype = ctypes.c_double
+			self._dll.ocSpeech_setPitch.argtypes = (ctypes.c_void_p, ctypes.c_double)
 			self._dll.ocSpeech_getVolume.restype = ctypes.c_double
+			self._dll.ocSpeech_setVolume.argtypes = (ctypes.c_void_p, ctypes.c_double)
 			self._dll.ocSpeech_getRate.restype = ctypes.c_double
+			self._dll.ocSpeech_setRate.argtypes = (ctypes.c_void_p, ctypes.c_double)
 		else:
 			log.debugWarning("Prosody options not supported")
 			# Set initial values for parameters that can't be queried.
@@ -224,7 +227,7 @@ class SynthDriver(SynthDriver):
 			self._pitch = pitch
 			return
 		rawPitch = self._percentToParam(pitch, self.MIN_PITCH, self.MAX_PITCH)
-		self._dll.ocSpeech_setPitch(rawPitch)
+		self._dll.ocSpeech_setPitch(self._handle, rawPitch)
 
 	def _get_volume(self):
 		if not self.supportsProsodyOptions:
@@ -237,7 +240,7 @@ class SynthDriver(SynthDriver):
 			self._volume = volume
 			return
 		rawVolume = volume / 100.0
-		self._dll.ocSpeech_setVolume(rawVolume)
+		self._dll.ocSpeech_setVolume(self._handle, rawVolume)
 
 	def _get_rate(self):
 		if not self.supportsProsodyOptions:
@@ -252,7 +255,7 @@ class SynthDriver(SynthDriver):
 			return
 		maxRate = self.BOOSTED_MAX_RATE if self._rateBoost else self.DEFAULT_MAX_RATE
 		rawRate = self._percentToParam(rate, self.MIN_RATE, maxRate)
-		self._dll.ocSpeech_setRate(rawRate)
+		self._dll.ocSpeech_setRate(self._handle, rawRate)
 
 	_rateBoost = False
 
