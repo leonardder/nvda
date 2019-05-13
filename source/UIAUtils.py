@@ -1,5 +1,5 @@
 #A part of NonVisual Desktop Access (NVDA)
-#Copyright (C) 2015-2016 NV Access Limited
+#Copyright (C) 2015-2019 NV Access Limited, Babbage B.V.
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
 
@@ -103,9 +103,10 @@ def iterUIARangeByUnit(rangeObj, moveUnit, reverse=False, expandUnit=None):
 	Splits a given UI Automation text range into smaller text ranges the size of the given unit and yields them.
 	@param rangeObj: the UI Automation text range to split.
 	@type rangeObj: L{UIAHandler.IUIAutomationTextRange}
-	@param unit: a UI Automation text unit.
+	@param moveUnit: a UI Automation text unit used to split the range.
 	@param reverse: true if the range should be walked backwards (from end to start)
 	@type reverse: bool
+	@param expandUnit: a UI Automation text unit used to expand the yielded ranges to.
 	@rtype: a generator that yields L{UIAHandler.IUIAutomationTextRange} objects.
 	"""
 	Endpoint_relativeEnd=UIAHandler.TextPatternRangeEndpoint_Start if reverse else UIAHandler.TextPatternRangeEndpoint_End
@@ -118,14 +119,15 @@ def iterUIARangeByUnit(rangeObj, moveUnit, reverse=False, expandUnit=None):
 	endRange=tempRange.Clone()
 	while relativeGTOperator(endRange.Move(moveUnit,minRelativeDistance),0):
 		moveEndpointByRange = True
-		if expandUnit:
+		if expandUnit and expandUnit is not moveUnit:
 			tempRange.MoveEndpointByUnit(Endpoint_relativeEnd,expandUnit, minRelativeDistance)
-			tempRange.ExpandToEnclosingUnit(expandUnit)
 			moveEndpointByRange = relativeLTOperator(tempRange.CompareEndpoints(Endpoint_relativeEnd,endRange,Endpoint_relativeStart),0)
 		if moveEndpointByRange:
 			tempRange.MoveEndpointByRange(Endpoint_relativeEnd,endRange,Endpoint_relativeStart)
 		else:
 			endRange.MoveEndpointByRange(Endpoint_relativeStart,tempRange,Endpoint_relativeEnd		)
+		if expandUnit or reverse:
+			tempRange.ExpandToEnclosingUnit(expandUnit or moveUnit)
 		pastEnd=relativeGTOperator(tempRange.CompareEndpoints(Endpoint_relativeEnd,rangeObj,Endpoint_relativeEnd),0)
 		if pastEnd:
 			tempRange.MoveEndpointByRange(Endpoint_relativeEnd,rangeObj,Endpoint_relativeEnd)
