@@ -181,12 +181,7 @@ class SynthDriver(SynthDriver):
 		self._wasCancelled = True
 		log.debug("Cancelling")
 		# There might be more text pending. Throw it away.
-		if self.supportsProsodyOptions:
-			# In this case however, we must keep any parameter changes.
-			self._queuedSpeech = [item for item in self._queuedSpeech
-				if not isinstance(item, basestring)]
-		else:
-			self._queuedSpeech = []
+		self._queuedSpeech = []
 		if self._player:
 			self._player.stop()
 
