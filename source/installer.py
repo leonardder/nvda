@@ -2,11 +2,14 @@
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
-#Copyright (C) 2011-2015 NV Access Limited, Joseph Lee
+#Copyright (C) 2011-2017 NV Access Limited, Joseph Lee, Babbage B.V.
 
 from ctypes import *
 from ctypes.wintypes import *
-import _winreg
+try:
+	import _winreg as winreg # Python 2.7 import
+except ImportError:
+	import winreg # Python 3 import
 import threading
 import time
 import os
@@ -21,6 +24,7 @@ import versionInfo
 from logHandler import log
 import addonHandler
 import easeOfAccess
+import COMRegistrationFixes
 
 _wsh=None
 def _getWSH():
@@ -31,11 +35,12 @@ def _getWSH():
 	return _wsh
 
 defaultStartMenuFolder=versionInfo.name
-with _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\Microsoft\Windows\CurrentVersion") as k: 
-	programFilesPath=_winreg.QueryValueEx(k, "ProgramFilesDir")[0] 
+with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\Microsoft\Windows\CurrentVersion") as k: 
+	programFilesPath=winreg.QueryValueEx(k, "ProgramFilesDir")[0] 
 defaultInstallPath=os.path.join(programFilesPath, versionInfo.name)
 
 def createShortcut(path,targetPath=None,arguments=None,iconLocation=None,workingDirectory=None,hotkey=None,prependSpecialFolder=None):
+	# #7696: The shortcut is only physically saved to disk if it does not already exist, or one or more properties have changed. 
 	wsh=_getWSH()
 	if prependSpecialFolder:
 		specialPath=wsh.SpecialFolders(prependSpecialFolder)
@@ -44,28 +49,36 @@ def createShortcut(path,targetPath=None,arguments=None,iconLocation=None,working
 		os.makedirs(os.path.dirname(path))
 	shortcutExists=os.path.isfile(path)
 	short=wsh.CreateShortcut(path)
-	short.TargetPath=targetPath
-	if arguments:
+	needsSave=not shortcutExists
+	if short.targetPath!=targetPath:
+		short.TargetPath=targetPath
+		needsSave=True
+	if arguments and short.arguments!=arguments:
 		short.arguments=arguments
+		needsSave=True
 	if not shortcutExists and hotkey:
 		short.Hotkey=hotkey
-	if iconLocation:
+		needsSave=True
+	if iconLocation and short.iconLocation!=iconLocation:
 		short.IconLocation=iconLocation
-	if workingDirectory:
+		needsSave=True
+	if workingDirectory and short.workingDirectory!=workingDirectory:
 		short.workingDirectory=workingDirectory
-	short.Save()
+		needsSave=True
+	if needsSave:
+		short.Save()
 
 def getStartMenuFolder(noDefault=False):
 	try:
-		with _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,u"SOFTWARE\\NVDA") as k:
-			return _winreg.QueryValueEx(k,u"Start Menu Folder")[0]
+		with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,config.NVDA_REGKEY) as k:
+			return winreg.QueryValueEx(k,u"Start Menu Folder")[0]
 	except WindowsError:
 		return defaultStartMenuFolder if not noDefault else None
 
 def getInstallPath(noDefault=False):
 	try:
-		k=_winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVDA")
-		return _winreg.QueryValueEx(k,"UninstallDirectory")[0]
+		k=winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVDA")
+		return winreg.QueryValueEx(k,"UninstallDirectory")[0]
 	except WindowsError:
 		return defaultInstallPath if not noDefault else None
 
@@ -135,10 +148,40 @@ def copyUserConfig(destPath):
 			destFilePath=os.path.join(destPath,os.path.relpath(sourceFilePath,sourcePath))
 			tryCopyFile(sourceFilePath,destFilePath)
 
+def removeOldLibFiles(destPath,rebootOK=False):
+	"""
+	Removes library files from previous versions of NVDA.
+	@param destPath: The path where NVDA is installed.
+	@ type destPath: string
+	@param rebootOK: If true then files can be removed on next reboot if trying to do so now fails.
+	@type rebootOK: boolean
+	"""
+	for topDir in ('lib','lib64'):
+		currentLibPath=os.path.join(destPath,topDir,versionInfo.version)
+		for parent,subdirs,files in os.walk(os.path.join(destPath,topDir),topdown=False):
+			if parent==currentLibPath:
+				# Lib dir for current installation. Don't touch this!
+				log.debug("Skipping current install lib path: %r"%parent)
+				continue
+			for d in subdirs:
+				path=os.path.join(parent,d)
+				log.debug("Removing old lib directory: %r"%path)
+				try:
+					os.rmdir(path)
+				except OSError:
+					log.warning("Failed to remove a directory no longer needed. This can be manually removed after a reboot or the  installer will try removing it again next time. Directory: %r"%path)
+			for f in files:
+				path=os.path.join(parent,f)
+				log.debug("Removing old lib file: %r"%path)
+				try:
+					tryRemoveFile(path,numRetries=2,rebootOK=rebootOK)
+				except RetriableFailure:
+					log.warning("A file no longer needed could not be removed. This can be manually removed after a reboot, or  the installer will try again next time. File: %r"%path)
+
 def removeOldProgramFiles(destPath):
-	# #3181: Remove espeak-data\voices except for variants.
+	# #3181: Remove espeak-ng-data\voices except for variants.
 	# Otherwise, there will be duplicates if voices have been moved in this new eSpeak version.
-	root = os.path.join(destPath, "synthDrivers", "espeak-data", "voices")
+	root = os.path.join(destPath, "synthDrivers", "espeak-ng-data", "voices")
 	try:
 		files = set(os.listdir(root))
 	except OSError:
@@ -171,21 +214,17 @@ uninstallerRegInfo={
 	"URLInfoAbout":versionInfo.url,
 }
 
-def registerInstallation(installDir,startMenuFolder,shouldCreateDesktopShortcut,startOnLogonScreen):
-	import _winreg
-	with _winreg.CreateKeyEx(_winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\NVDA",0,_winreg.KEY_WRITE) as k:
+def registerInstallation(installDir,startMenuFolder,shouldCreateDesktopShortcut,startOnLogonScreen,configInLocalAppData=False):
+	with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\NVDA",0,winreg.KEY_WRITE) as k:
 		for name,value in uninstallerRegInfo.iteritems(): 
-			_winreg.SetValueEx(k,name,None,_winreg.REG_SZ,value.format(installDir=installDir))
-	with _winreg.CreateKeyEx(_winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\nvda.exe",0,_winreg.KEY_WRITE) as k:
-		_winreg.SetValueEx(k,"",None,_winreg.REG_SZ,os.path.join(installDir,"nvda.exe"))
-	with _winreg.CreateKeyEx(_winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\nvda",0,_winreg.KEY_WRITE) as k:
-		_winreg.SetValueEx(k,"startMenuFolder",None,_winreg.REG_SZ,startMenuFolder)
-	if easeOfAccess.isSupported:
-		registerEaseOfAccess(installDir)
-	else:
-		import nvda_service
-		nvda_service.installService(installDir)
-		nvda_service.startService()
+			winreg.SetValueEx(k,name,None,winreg.REG_SZ,value.format(installDir=installDir))
+	with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\nvda.exe",0,winreg.KEY_WRITE) as k:
+		winreg.SetValueEx(k,"",None,winreg.REG_SZ,os.path.join(installDir,"nvda.exe"))
+	with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE,config.NVDA_REGKEY,0,winreg.KEY_WRITE) as k:
+		winreg.SetValueEx(k,"startMenuFolder",None,winreg.REG_SZ,startMenuFolder)
+		if configInLocalAppData:
+			winreg.SetValueEx(k,config.CONFIG_IN_LOCAL_APPDATA_SUBKEY,None,winreg.REG_DWORD,int(configInLocalAppData))
+	registerEaseOfAccess(installDir)
 	if startOnLogonScreen is not None:
 		config._setStartOnLogonScreen(startOnLogonScreen)
 	NVDAExe=os.path.join(installDir,u"nvda.exe")
@@ -219,22 +258,12 @@ def isDesktopShortcutInstalled():
 	return os.path.isfile(shortcutPath)
 
 def unregisterInstallation(keepDesktopShortcut=False):
-	import nvda_service
 	try:
-		nvda_service.stopService()
-	except:
+		winreg.DeleteKeyEx(winreg.HKEY_LOCAL_MACHINE, easeOfAccess.APP_KEY_PATH,
+			winreg.KEY_WOW64_64KEY)
+		easeOfAccess.setAutoStart(winreg.HKEY_LOCAL_MACHINE, False)
+	except WindowsError:
 		pass
-	try:
-		nvda_service.removeService()
-	except:
-		pass
-	if easeOfAccess.isSupported:
-		try:
-			_winreg.DeleteKeyEx(_winreg.HKEY_LOCAL_MACHINE, easeOfAccess.APP_KEY_PATH,
-				_winreg.KEY_WOW64_64KEY)
-			easeOfAccess.setAutoStart(_winreg.HKEY_LOCAL_MACHINE, False)
-		except WindowsError:
-			pass
 	wsh=_getWSH()
 	desktopPath=os.path.join(wsh.SpecialFolders("AllUsersDesktop"),"NVDA.lnk")
 	if not keepDesktopShortcut and os.path.isfile(desktopPath):
@@ -249,15 +278,15 @@ def unregisterInstallation(keepDesktopShortcut=False):
 		if os.path.isdir(startMenuPath):
 			shutil.rmtree(startMenuPath,ignore_errors=True)
 	try:
-		_winreg.DeleteKey(_winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\nvda")
+		winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\nvda")
 	except WindowsError:
 		pass
 	try:
-		_winreg.DeleteKey(_winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\nvda.exe")
+		winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\nvda.exe")
 	except WindowsError:
 		pass
 	try:
-		_winreg.DeleteKey(_winreg.HKEY_LOCAL_MACHINE,"SOFTWARE\\nvda")
+		winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE,config.NVDA_REGKEY)
 	except WindowsError:
 		pass
 	unregisterAddonFileAssociation()
@@ -265,21 +294,21 @@ def unregisterInstallation(keepDesktopShortcut=False):
 def registerAddonFileAssociation(slaveExe):
 	try:
 		# Create progID for NVDA ad-ons
-		with _winreg.CreateKeyEx(_winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\%s" % addonHandler.NVDA_ADDON_PROG_ID, 0, _winreg.KEY_WRITE) as k:
+		with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\%s" % addonHandler.NVDA_ADDON_PROG_ID, 0, winreg.KEY_WRITE) as k:
 			# Translators: A file extension label for NVDA add-on package.
-			_winreg.SetValueEx(k, None, 0, _winreg.REG_SZ, _("NVDA add-on package"))
-			with _winreg.CreateKeyEx(k, "DefaultIcon", 0, _winreg.KEY_WRITE) as k2:
-				_winreg.SetValueEx(k2, None, 0, _winreg.REG_SZ, "@{slaveExe},1".format(slaveExe=slaveExe))
+			winreg.SetValueEx(k, None, 0, winreg.REG_SZ, _("NVDA add-on package"))
+			with winreg.CreateKeyEx(k, "DefaultIcon", 0, winreg.KEY_WRITE) as k2:
+				winreg.SetValueEx(k2, None, 0, winreg.REG_SZ, "@{slaveExe},1".format(slaveExe=slaveExe))
 			# Point the open verb to nvda_slave addons_installAddonPackage action
-			with _winreg.CreateKeyEx(k, "shell\\open\\command", 0, _winreg.KEY_WRITE) as k2:
-				_winreg.SetValueEx(k2, None, 0, _winreg.REG_SZ, u"\"{slaveExe}\" addons_installAddonPackage \"%1\"".format(slaveExe=slaveExe))
+			with winreg.CreateKeyEx(k, "shell\\open\\command", 0, winreg.KEY_WRITE) as k2:
+				winreg.SetValueEx(k2, None, 0, winreg.REG_SZ, u"\"{slaveExe}\" addons_installAddonPackage \"%1\"".format(slaveExe=slaveExe))
 		# Now associate addon extension to the created prog id.
-		with _winreg.CreateKeyEx(_winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\.%s" % addonHandler.BUNDLE_EXTENSION, 0, _winreg.KEY_WRITE) as k:
-			_winreg.SetValueEx(k, None, 0, _winreg.REG_SZ, addonHandler.NVDA_ADDON_PROG_ID)
-			_winreg.SetValueEx(k, "Content Type", 0, _winreg.REG_SZ, addonHandler.BUNDLE_MIMETYPE)
+		with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Classes\\.%s" % addonHandler.BUNDLE_EXTENSION, 0, winreg.KEY_WRITE) as k:
+			winreg.SetValueEx(k, None, 0, winreg.REG_SZ, addonHandler.NVDA_ADDON_PROG_ID)
+			winreg.SetValueEx(k, "Content Type", 0, winreg.REG_SZ, addonHandler.BUNDLE_MIMETYPE)
 			# Add NVDA to the "open With" list
-			k2 = _winreg.CreateKeyEx(k, "OpenWithProgids\\%s" % addonHandler.NVDA_ADDON_PROG_ID, 0, _winreg.KEY_WRITE)
-			_winreg.CloseKey(k2)
+			k2 = winreg.CreateKeyEx(k, "OpenWithProgids\\%s" % addonHandler.NVDA_ADDON_PROG_ID, 0, winreg.KEY_WRITE)
+			winreg.CloseKey(k2)
 		# Notify the shell that a file association has changed:
 		shellapi.SHChangeNotify(shellapi.SHCNE_ASSOCCHANGED, shellapi.SHCNF_IDLIST, None, None)
 	except WindowsError:
@@ -288,7 +317,7 @@ def registerAddonFileAssociation(slaveExe):
 def unregisterAddonFileAssociation():
 	try:
 		# As per MSDN recomendation, we only need to remove the prog ID.
-		_deleteKeyAndSubkeys(_winreg.HKEY_LOCAL_MACHINE, "Software\\Classes\\%s" % addonHandler.NVDA_ADDON_PROG_ID)
+		_deleteKeyAndSubkeys(winreg.HKEY_LOCAL_MACHINE, "Software\\Classes\\%s" % addonHandler.NVDA_ADDON_PROG_ID)
 	except WindowsError:
 		# This is probably the first install, so just ignore the error.
 		return
@@ -297,18 +326,18 @@ def unregisterAddonFileAssociation():
 
 # Windows API call regDeleteTree is only available on vist and above so rule our own.
 def _deleteKeyAndSubkeys(key, subkey):
-	with _winreg.OpenKey(key, subkey, 0, _winreg.KEY_WRITE|_winreg.KEY_READ) as k:
+	with winreg.OpenKey(key, subkey, 0, winreg.KEY_WRITE|winreg.KEY_READ) as k:
 		# Recursively delete subkeys (Depth first search order)
 		# So Pythonic... </rant>
 		for i in itertools.count():
 			try:
-				subkeyName = _winreg.EnumKey(k, i)
+				subkeyName = winreg.EnumKey(k, i)
 			except WindowsError:
 				break
 			# Recursive call.
 			_deleteKeyAndSubkeys(k, subkeyName)
 		# Delete this key
-		_winreg.DeleteKey(k, "")
+		winreg.DeleteKey(k, "")
 
 class RetriableFailure(Exception):
 	pass
@@ -364,6 +393,11 @@ def tryCopyFile(sourceFilePath,destFilePath):
 
 def install(shouldCreateDesktopShortcut=True,shouldRunAtLogon=True):
 	prevInstallPath=getInstallPath(noDefault=True)
+	try:
+		k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, config.NVDA_REGKEY)
+		configInLocalAppData = bool(winreg.QueryValueEx(k, config.CONFIG_IN_LOCAL_APPDATA_SUBKEY)[0])
+	except WindowsError:
+		configInLocalAppData = False
 	unregisterInstallation(keepDesktopShortcut=shouldCreateDesktopShortcut)
 	installDir=defaultInstallPath
 	startMenuFolder=defaultStartMenuFolder
@@ -388,7 +422,9 @@ def install(shouldCreateDesktopShortcut=True,shouldRunAtLogon=True):
 			break
 	else:
 		raise RuntimeError("No available executable to use as nvda.exe")
-	registerInstallation(installDir,startMenuFolder,shouldCreateDesktopShortcut,shouldRunAtLogon)
+	registerInstallation(installDir,startMenuFolder,shouldCreateDesktopShortcut,shouldRunAtLogon,configInLocalAppData)
+	removeOldLibFiles(installDir,rebootOK=True)
+	COMRegistrationFixes.fixCOMRegistrations()
 
 def removeOldLoggedFiles(installPath):
 	datPath=os.path.join(installPath,"uninstall.dat")
@@ -417,33 +453,34 @@ def createPortableCopy(destPath,shouldCopyUserConfig=True):
 	tryCopyFile(os.path.join(destPath,"nvda_noUIAccess.exe"),os.path.join(destPath,"nvda.exe"))
 	if shouldCopyUserConfig:
 		copyUserConfig(os.path.join(destPath,'userConfig'))
+	removeOldLibFiles(destPath,rebootOK=True)
 
 def registerEaseOfAccess(installDir):
-	with _winreg.CreateKeyEx(_winreg.HKEY_LOCAL_MACHINE, easeOfAccess.APP_KEY_PATH, 0,
-			_winreg.KEY_ALL_ACCESS | _winreg.KEY_WOW64_64KEY) as appKey:
-		_winreg.SetValueEx(appKey, "ApplicationName", None, _winreg.REG_SZ,
+	with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, easeOfAccess.APP_KEY_PATH, 0,
+			winreg.KEY_ALL_ACCESS | winreg.KEY_WOW64_64KEY) as appKey:
+		winreg.SetValueEx(appKey, "ApplicationName", None, winreg.REG_SZ,
 			versionInfo.name)
-		_winreg.SetValueEx(appKey, "Description", None, _winreg.REG_SZ,
+		winreg.SetValueEx(appKey, "Description", None, winreg.REG_SZ,
 			versionInfo.longName)
 		if easeOfAccess.canConfigTerminateOnDesktopSwitch:
-			_winreg.SetValueEx(appKey, "Profile", None, _winreg.REG_SZ,
+			winreg.SetValueEx(appKey, "Profile", None, winreg.REG_SZ,
 				'<HCIModel><Accommodation type="severe vision"/></HCIModel>')
-			_winreg.SetValueEx(appKey, "SimpleProfile", None, _winreg.REG_SZ,
+			winreg.SetValueEx(appKey, "SimpleProfile", None, winreg.REG_SZ,
 				"screenreader")
-			_winreg.SetValueEx(appKey, "ATExe", None, _winreg.REG_SZ,
+			winreg.SetValueEx(appKey, "ATExe", None, winreg.REG_SZ,
 				"nvda.exe")
-			_winreg.SetValueEx(appKey, "StartExe", None, _winreg.REG_SZ,
+			winreg.SetValueEx(appKey, "StartExe", None, winreg.REG_SZ,
 				os.path.join(installDir, u"nvda.exe"))
-			_winreg.SetValueEx(appKey, "StartParams", None, _winreg.REG_SZ,
+			winreg.SetValueEx(appKey, "StartParams", None, winreg.REG_SZ,
 				"--ease-of-access")
-			_winreg.SetValueEx(appKey, "TerminateOnDesktopSwitch", None,
-				_winreg.REG_DWORD, 0)
+			winreg.SetValueEx(appKey, "TerminateOnDesktopSwitch", None,
+				winreg.REG_DWORD, 0)
 		else:
 			# We don't want NVDA to appear in EoA because
 			# starting NVDA from there won't work in this case.
 			# We can do this by not setting Profile and SimpleProfile.
 			# NVDA can still change the EoA logon settings.
-			_winreg.SetValueEx(appKey, "ATExe", None, _winreg.REG_SZ,
+			winreg.SetValueEx(appKey, "ATExe", None, winreg.REG_SZ,
 				"nvda_eoaProxy.exe")
-			_winreg.SetValueEx(appKey, "StartExe", None, _winreg.REG_SZ,
+			winreg.SetValueEx(appKey, "StartExe", None, winreg.REG_SZ,
 				os.path.join(installDir, u"nvda_eoaProxy.exe"))

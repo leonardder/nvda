@@ -8,13 +8,11 @@ dist
 *.dll
 *.exe
 *.manifest
-source/synthDrivers/espeak-data
+source/synthDrivers/espeak-ng-data
 source/lib
 source/lib64
 source/typelibs
-source/images
 source/louis
-source/waves
 *.obj
 *.exp
 *.lib
@@ -31,6 +29,7 @@ extras/controllerClient/x64
 source/_buildVersion.py
 user_docs/*/keyCommands.t2t
 output
+testOutput
 source/brailleDisplayDrivers/handyTech
 ./developerGuide.html
 user_docs/build.t2tConf
@@ -39,3 +38,5 @@ uninstaller/UAC.nsh
 *.pyc
 *.pyo
 *.dmp
+tests/unit/nvda.ini
+source/locale/*/cldr.dic

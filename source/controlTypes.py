@@ -2,7 +2,7 @@
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
-#Copyright (C) 2007-2014 NV Access Limited
+#Copyright (C) 2007-2016 NV Access Limited, Babbage B.V.
 
 ROLE_UNKNOWN=0
 ROLE_WINDOW=1
@@ -64,7 +64,7 @@ ROLE_GROUPING=56
 ROLE_PROPERTYPAGE=57
 ROLE_CANVAS=58
 ROLE_CAPTION=59
-ROLE_CHECKMENUITEM=60,
+ROLE_CHECKMENUITEM=60
 ROLE_DATEEDITOR=61
 ROLE_ICON=62
 ROLE_DIRECTORYPANE=63
@@ -147,6 +147,11 @@ ROLE_DATAITEM=140
 ROLE_HEADERITEM=141
 ROLE_THUMB=142
 ROLE_CALENDAR=143
+ROLE_VIDEO=144
+ROLE_AUDIO=145
+ROLE_CHARTELEMENT=146
+ROLE_DELETED_CONTENT=147
+ROLE_INSERTED_CONTENT=148
 
 STATE_UNAVAILABLE=0X1
 STATE_FOCUSED=0X2
@@ -426,8 +431,8 @@ roleLabels={
 	ROLE_DESKTOPICON:_("desktop icon"),
 	# Translators: Identifies an alert message such as file download alert in Internet explorer 9 and above.
 	ROLE_ALERT:_("alert"),
-	# Translators: Identifies an internal frame (commonly called iframe; usually seen when browsing some sites with Internet Explorer).
-	ROLE_INTERNALFRAME:_("IFrame"),
+	# Translators: Identifies an internal frame. This is usually a frame on a web page; i.e. a web page embedded within a web page.
+	ROLE_INTERNALFRAME:_("frame"),
 	# Translators: Identifies desktop pane (the desktop window).
 	ROLE_DESKTOPPANE:_("desktop pane"),
 	# Translators: Identifies an option pane.
@@ -453,7 +458,7 @@ roleLabels={
 	# Translators: Describes text formatting.
 	ROLE_BOLD:_("bold"),
 	# Translators: Describes text formatting.
-	ROLE_ITALIC:_("ITALIC"),
+	ROLE_ITALIC:_("italic"),
 	# Translators: Describes text formatting.
 	ROLE_UNDERLINE:_("underline"),
 	# Translators: Describes text formatting.
@@ -479,6 +484,14 @@ roleLabels={
 	# Translators: Identifies a thumb control (a button-like control for changing options).
 	ROLE_THUMB:_("thumb control"),
 	ROLE_CALENDAR:_("calendar"),
+	ROLE_VIDEO:_("video"),
+	ROLE_AUDIO:_("audio"),
+	# Translators: Identifies a chart element.
+	ROLE_CHARTELEMENT:_("chart element"),
+	# Translators: Identifies deleted content. 
+	ROLE_DELETED_CONTENT:_("deleted"),
+	# Translators: Identifies inserted content. 
+	ROLE_INSERTED_CONTENT:_("inserted"),
 }
 
 stateLabels={
@@ -538,7 +551,7 @@ stateLabels={
 	STATE_DRAGGABLE:_("draggable"),
 	STATE_DRAGGING:_("dragging"),
 	# Translators: Reported where an object which is being dragged can be dropped.
-	# This is only reported for objects which support accessible drag and drop.
+	# This is only reported for objects that support accessible drag and drop.
 	STATE_DROPTARGET:_("drop target"),
 	STATE_SORTED:_("sorted"),
 	STATE_SORTED_ASCENDING:_("sorted ascending"),
@@ -564,8 +577,13 @@ stateLabels={
 negativeStateLabels={
 	# Translators: This is presented when a selectable object (e.g. a list item) is not selected.
 	STATE_SELECTED:_("not selected"),
+	# Translators: This is presented when a button is not pressed.
+	STATE_PRESSED:_("not pressed"),
 	# Translators: This is presented when a checkbox is not checked.
 	STATE_CHECKED:_("not checked"),
+	# Translators: This is presented when drag and drop is finished.
+	# This is only reported for objects which support accessible drag and drop.
+	STATE_DROPTARGET:_("done dragging"),
 }
 
 silentRolesOnFocus={
@@ -580,6 +598,7 @@ silentRolesOnFocus={
 	ROLE_CHECKMENUITEM,
 	ROLE_TREEVIEWITEM,
 	ROLE_STATICTEXT,
+	ROLE_BORDER,
 }
 
 silentValuesForRoles={
@@ -612,8 +631,38 @@ REASON_CARET="caret"
 REASON_ONLYCACHE="onlyCache"
 #}
 
-def processPositiveStates(role, states, reason, positiveStates):
-	positiveStates = positiveStates.copy()
+#: Text to use for 'current' values. These describe if an item is the current item 
+#: within a particular kind of selection.
+isCurrentLabels = {
+	# Translators: Presented when an item is marked as current in a collection of items
+	True:_("current"),
+	# Translators: Presented when a page item is marked as current in a collection of page items
+	"page":_("current page"),
+	# Translators: Presented when a step item is marked as current in a collection of step items
+	"step":_("current step"),
+	# Translators: Presented when a location item is marked as current in a collection of location items
+	"location":_("current location"),
+	# Translators: Presented when a date item is marked as current in a collection of date items
+	"date":_("current date"),
+	# Translators: Presented when a time item is marked as current in a collection of time items
+	"time":_("current time"),
+}
+
+def processPositiveStates(role, states, reason, positiveStates=None):
+	"""Processes the states for an object and returns the positive states to output for a specified reason.
+	For example, if C{STATE_CHECKED} is in the returned states, it means that the processed object is checked.
+	@param role: The role of the object to process states for (e.g. C{ROLE_CHECKBOX}.
+	@type role: int
+	@param states: The raw states for an object to process.
+	@type states: set
+	@param reason: The reason to process the states (e.g. C{REASON_FOCUS}.
+	@type reason: str
+	@param positiveStates: Used for C{REASON_CHANGE}, specifies states changed from negative to positive;
+	@type positiveStates: set
+	@return: The processed positive states.
+	@rtype: set
+	"""
+	positiveStates = positiveStates.copy() if positiveStates is not None else states.copy()
 	# The user never cares about certain states.
 	if role==ROLE_EDITABLETEXT:
 		positiveStates.discard(STATE_EDITABLE)
@@ -645,25 +694,56 @@ def processPositiveStates(role, states, reason, positiveStates):
 		positiveStates.discard(STATE_LINKED)
 		if role in (ROLE_LISTITEM, ROLE_TREEVIEWITEM, ROLE_MENUITEM, ROLE_TABLEROW) and STATE_SELECTABLE in states:
 			positiveStates.discard(STATE_SELECTED)
-	if role != ROLE_EDITABLETEXT:
+	if role not in (ROLE_EDITABLETEXT, ROLE_CHECKBOX):
 		positiveStates.discard(STATE_READONLY)
 	if role == ROLE_CHECKBOX:
 		positiveStates.discard(STATE_PRESSED)
-	if role == ROLE_MENUITEM:
-		# The user doesn't usually care if a menu item is expanded or collapsed.
+	if role == ROLE_MENUITEM and STATE_HASPOPUP in positiveStates:
+		# The user doesn't usually care if a submenu is expanded or collapsed.
 		positiveStates.discard(STATE_COLLAPSED)
 		positiveStates.discard(STATE_EXPANDED)
 	if STATE_FOCUSABLE not in states:
 		positiveStates.discard(STATE_EDITABLE)
 	return positiveStates
 
-def processNegativeStates(role, states, reason, negativeStates):
+def processNegativeStates(role, states, reason, negativeStates=None):
+	"""Processes the states for an object and returns the negative states to output for a specified reason.
+	For example, if C{STATE_CHECKED} is in the returned states, it means that the processed object is not checked.
+	@param role: The role of the object to process states for (e.g. C{ROLE_CHECKBOX}.
+	@type role: int
+	@param states: The raw states for an object to process.
+	@type states: set
+	@param reason: The reason to process the states (e.g. C{REASON_FOCUS}.
+	@type reason: str
+	@param negativeStates: Used for C{REASON_CHANGE}, specifies states changed from positive to negative;
+	@type negativeStates: set
+	@return: The processed negative states.
+	@rtype: set
+	"""
+	if reason == REASON_CHANGE and not isinstance(negativeStates, set):
+		raise TypeError("negativeStates must be a set for this reason")
 	speakNegatives = set()
 	# Add the negative selected state if the control is selectable,
-	# but only if it is either focused or this is something other than a change event.
+	# but only if it is reported for the reason of focus, or this is a change to the focused object. 
 	# The condition stops "not selected" from being spoken in some broken controls
 	# when the state change for the previous focus is issued before the focus change.
-	if role in (ROLE_LISTITEM, ROLE_TREEVIEWITEM, ROLE_TABLEROW) and STATE_SELECTABLE in states and (reason != REASON_CHANGE or STATE_FOCUSED in states):
+	if (
+		# Only include if the object is actually selectable
+		STATE_SELECTABLE in states
+		# Only include if the object is focusable (E.g. ARIA grid cells, but not standard html tables)
+		and STATE_FOCUSABLE in states
+		# Only include  if reporting the focus or when states are changing on the focus.
+		# This is to avoid exposing it for things like caret movement in browse mode. 
+		and (reason == REASON_FOCUS or (reason == REASON_CHANGE and STATE_FOCUSED in states))
+		and role in (
+			ROLE_LISTITEM, 
+			ROLE_TREEVIEWITEM, 
+			ROLE_TABLEROW,
+			ROLE_TABLECELL,
+			ROLE_TABLECOLUMNHEADER,
+			ROLE_TABLEROWHEADER
+		)
+	):
 		speakNegatives.add(STATE_SELECTED)
 	# Restrict "not checked" in a similar way to "not selected".
 	if (role in (ROLE_CHECKBOX, ROLE_RADIOBUTTON, ROLE_CHECKMENUITEM) or STATE_CHECKABLE in states)  and (STATE_HALFCHECKED not in states) and (reason != REASON_CHANGE or STATE_FOCUSED in states):
@@ -677,6 +757,9 @@ def processNegativeStates(role, states, reason, negativeStates):
 		# Return only those supplied negative states which should be spoken;
 		# i.e. the states in both sets.
 		speakNegatives &= negativeStates
+		# #6946: if HALFCHECKED is present but CHECKED isn't, we should make sure we add CHECKED to speakNegatives.
+		if (STATE_HALFCHECKED in negativeStates and STATE_CHECKED not in states):
+			speakNegatives.add(STATE_CHECKED)
 		if STATES_SORTED & negativeStates and not STATES_SORTED & states:
 			# If the object has just stopped being sorted, just report not sorted.
 			# The user doesn't care how it was sorted before.
@@ -686,3 +769,36 @@ def processNegativeStates(role, states, reason, negativeStates):
 		# This is not a state change; only positive states were supplied.
 		# Return all negative states which should be spoken, excluding the positive states.
 		return speakNegatives - states
+
+def processAndLabelStates(role, states, reason, positiveStates=None, negativeStates=None, positiveStateLabelDict={}, negativeStateLabelDict={}):
+	"""Processes the states for an object and returns the appropriate state labels for both positive and negative states.
+	@param role: The role of the object to process states for (e.g. C{ROLE_CHECKBOX}.
+	@type role: int
+	@param states: The raw states for an object to process.
+	@type states: set
+	@param reason: The reason to process the states (e.g. C{REASON_FOCUS}.
+	@type reason: str
+	@param positiveStates: Used for C{REASON_CHANGE}, specifies states changed from negative to positive;
+	@type positiveStates: set
+	@param negativeStates: Used for C{REASON_CHANGE}, specifies states changed from positive to negative;
+	@type negativeStates: setpositiveStateLabelDict={}, negativeStateLabelDict
+	@param positiveStateLabelDict: Dictionary containing state identifiers as keys and associated positive labels as their values.
+	@type positiveStateLabelDict: dict
+	@param negativeStateLabelDict: Dictionary containing state identifiers as keys and associated negative labels as their values.
+	@type negativeStateLabelDict: dict
+	@return: The labels of the relevant positive and negative states.
+	@rtype: [str, ...]
+	"""
+	mergedStateLabels=[]
+	positiveStates = processPositiveStates(role, states, reason, positiveStates)
+	negativeStates = processNegativeStates(role, states, reason, negativeStates)
+	for state in sorted(positiveStates | negativeStates):
+		if state in positiveStates:
+			mergedStateLabels.append(positiveStateLabelDict.get(state, stateLabels[state]))
+		elif state in negativeStates:
+			# Translators: Indicates that a particular state of an object is negated.
+			# Separate strings have now been defined for commonly negated states (e.g. not selected and not checked),
+			# but this still might be used in some other cases.
+			# %s will be replaced with the full identifier of the negated state (e.g. selected).
+			mergedStateLabels.append(negativeStateLabelDict.get(state, negativeStateLabels.get(state, _("not %s") % stateLabels[state])))
+	return mergedStateLabels

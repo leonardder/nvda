@@ -1,14 +1,14 @@
 ﻿#locale/it/symbols.dic
 #A part of NonVisual Desktop Access (NVDA)
-#Copyright (c) 2011-2012 NVDA contributors.
+#Copyright (c) 2011-2017 NVDA contributors.
 #This file is covered by the GNU General Public License.
 
 complexSymbols:
 # identifier	regexp
 # Sentence endings.
 . sentence ending	(?<=[^\s.])\.(?=[\"'”’)\s\],;:»]|$)
-! sentence ending	(?<=[^\s!])\!(?=[\"'”’)\s\]!,;:»]|$)
-? sentence ending	(?<=[^\s?])\?(?=[\"'”’)\s\]\?,;:»]|$)
+! sentence ending	(?<=[^\s!])\!(?=[\"'”’)\s\]!,;:»\.!]|$)
+? sentence ending	(?<=[^\s?])\?(?=[\"'”’)\s\]\?,;:»\.!]|$)
 # Phrase endings.
 ; phrase ending	(?<=[^\s;]);(?=\s|$)
 : phrase ending	(?<=[^\s:]):(?=\s|$)
@@ -38,7 +38,7 @@ negative number	meno	none	norep
 \r	ritorno a capo	char
  	spazio	char
  	spazio	char	# no-break space
-\\_	\_	some	always	#Per tags Loquendo
+#\\_	\_	some	always	#Per tags Loquendo
 
 # Standard punctuation/symbols
 !	punto esclamativo	all
@@ -84,7 +84,6 @@ _	sottolineato	most
 •	puntato	some
 …	punto punto punto	all	always
 ...	punto punto punto	all	always
-	puntato	some
 “	aperte virgolette	most
 ”	chiuse virgolette	most
 ‘	aperto apostrofo	most
@@ -95,12 +94,19 @@ _	sottolineato	most
 ¨	dieresi	most
 ‎	marcatore da sinistra a destra	char
 ‏	marcatore da destra a sinistra	char
+	puntato	some
 ■	puntato	some
 ▪	puntato	some
 ◾	puntato	some
 ◦	puntato	some
-➔	freccia destra	some
 §	paragrafo	all
+⇒	doppia freccia a destra	some
+⇨	freccia a destra bianca	some
+➢	punta di freccia a destra	some
+❖	puntato	some
+♣	puntato	some
+♦	puntato	some
+§	section	all
 °	gradi	all	always	#per Loquendo
 «	aperte doppie virgolette
 »	chiuse doppie virgolette
@@ -115,11 +121,13 @@ _	sottolineato	most
 ×	per	most
 ÷	diviso per	most
 ←	freccia sinistra	some
+↑	freccia su	some
 →	freccia destra	some
+↓	freccia giù	some
 ✓	segno di spunta	some
 ✔	segno di spunta	some
-#Mathematical Operators U+2200 to U+220F
 
+#Mathematical Operators U+2200 to U+220F
 ∀	per ogni 	none
 ∁	Complemento	none
 ∂	derivata parziale	none
@@ -138,7 +146,6 @@ _	sottolineato	most
 ∏	prodotto n-ario	none
 
 # Miscellaneous Mathematical Operators
-
 ∑	sommatoria n-aria	none
 √	radice quadrata	none
 ∛	RADICE CUBICA	none
@@ -167,3 +174,22 @@ _	sottolineato	most
 ¬	not	none
 ⟺	se e solo se	some
 
+# Vulgur Fractions U+2150 to U+215E
+⅐	un settimo	none
+⅑	un nono	none
+⅒	un decimo	none
+⅓	un terzo	none
+⅔	due terzi	none
+⅕	un quinto	none
+⅖	due quinti	none
+⅗	tre quinti	none
+⅘	quattro quinti	none
+⅙	un sesto	none
+⅚	cinque sesti	none
+⅛	un ottavo	none
+⅜	tre ottavi	none
+⅝	cinque ottavi	none
+⅞	sette ottavi	none
+
+# Miscellaneous Technical
+⌘	tasto Command Mac	none

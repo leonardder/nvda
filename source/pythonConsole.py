@@ -2,7 +2,7 @@
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
-#Copyright (C) 2008-2013 NV Access Limited
+#Copyright (C) 2008-2017 NV Access Limited
 
 import watchdog
 
@@ -10,7 +10,10 @@ import watchdog
 To use, call L{initialize} to create a singleton instance of the console GUI. This can then be accessed externally as L{consoleUI}.
 """
 
-import __builtin__
+try:
+	import __builtin__ as builtins # Python 2.7 import
+except ImportError:
+	import builtins # Python 3 import
 import os
 import code
 import sys
@@ -120,10 +123,10 @@ class PythonConsole(code.InteractiveConsole, AutoPropertyObject):
 		stdout, stderr = sys.stdout, sys.stderr
 		sys.stdout = sys.stderr = self
 		# Prevent this from messing with the gettext "_" builtin.
-		saved_ = __builtin__._
+		saved_ = builtins._
 		more = code.InteractiveConsole.push(self, line)
 		sys.stdout, sys.stderr = stdout, stderr
-		__builtin__._ = saved_
+		builtins._ = saved_
 		self.prompt = "..." if more else ">>>"
 		return more
 
@@ -249,7 +252,9 @@ class ConsoleUI(wx.Frame):
 		if self.completionAmbiguous:
 			menu = wx.Menu()
 			for comp in completions:
-				item = menu.Append(wx.ID_ANY, comp)
+				# Only show text after the last dot (so as to not keep repeting the class or module in the context menu)
+				label=comp.rsplit('.',1)[-1]
+				item = menu.Append(wx.ID_ANY, label)
 				self.Bind(wx.EVT_MENU,
 					lambda evt, completion=comp: self._insertCompletion(original, completion),
 					item)

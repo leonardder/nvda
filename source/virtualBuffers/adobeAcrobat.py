@@ -5,6 +5,7 @@
 #Copyright (C) 2009-2012 NV Access Limited, Aleksey Sadovoy
 
 from . import VirtualBuffer, VirtualBufferTextInfo
+import browseMode
 import controlTypes
 import NVDAObjects.IAccessible
 from NVDAObjects.IAccessible.adobeAcrobat import normalizeStdName, AcrobatNode
@@ -16,6 +17,29 @@ import textInfos
 import languageHandler
 
 class AdobeAcrobat_TextInfo(VirtualBufferTextInfo):
+
+	def _getBoundingRectFromOffset(self,offset):
+		formatFieldStart, formatFieldEnd = self._getUnitOffsets(self.UNIT_FORMATFIELD, offset)
+		# The format field starts at the first character.
+		for field in reversed(self._getFieldsInRange(formatFieldStart, formatFieldStart+1)):
+			if not (isinstance(field, textInfos.FieldCommand) and field.command == "formatChange"):
+				# This is no format field.
+				continue
+			attrs = field.field
+			indexInParent = attrs.get("_indexInParent")
+			if indexInParent is None:
+				continue
+			try:
+				obj = self._getNVDAObjectFromOffset(offset).getChild(indexInParent)
+			except IndexError:
+				obj = None
+			if not obj:
+				continue
+			if not obj.location:
+				# Older versions of Adobe Reader have per word objects, but they don't expose a location
+				break
+			return obj.location
+		return super(AdobeAcrobat_TextInfo, self)._getBoundingRectFromOffset(offset)
 
 	def _normalizeControlField(self,attrs):
 		stdName = attrs.get("acrobat::stdname", "")
@@ -48,6 +72,10 @@ class AdobeAcrobat_TextInfo(VirtualBufferTextInfo):
 	def _normalizeFormatField(self, attrs):
 		try:
 			attrs["language"] = languageHandler.normalizeLanguage(attrs["language"])
+		except KeyError:
+			pass
+		try:
+			attrs["_indexInParent"] = int(attrs["_indexInParent"])
 		except KeyError:
 			pass
 		return attrs
@@ -120,3 +148,10 @@ class AdobeAcrobat(VirtualBuffer):
 			return nextHandler()
 		if not self._handleScrollTo(obj):
 			return nextHandler()
+
+	def _get_ElementsListDialog(self):
+		return ElementsListDialog
+
+class ElementsListDialog(browseMode.ElementsListDialog):
+
+	ELEMENT_TYPES=browseMode.ElementsListDialog.ELEMENT_TYPES[0:2]

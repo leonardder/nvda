@@ -1,11 +1,12 @@
 #treeInterceptorHandler.py
 #A part of NonVisual Desktop Access (NVDA)
+#Copyright (C) 2006-2017 NV Access Limited, Davy Kager
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
-#Copyright (C) 2006-2010 Michael Curran <mick@kulgan.net>, James Teh <jamie@jantrid.net>
 
 from logHandler import log
 import baseObject
+import documentBase
 import api
 import review
 import textInfos
@@ -19,19 +20,28 @@ def getTreeInterceptor(obj):
 		if obj in ti:
 			return ti
 
-def update(obj):
+def update(obj, force=False):
 	# Don't create treeInterceptors for objects for which NVDA should sleep.
 	if obj.sleepMode:
 		return None
 	#If this object already has a treeInterceptor, just return that and don't bother trying to create one
 	ti=obj.treeInterceptor
 	if not ti:
-		if not obj.shouldCreateTreeInterceptor:
+		if not obj.shouldCreateTreeInterceptor and not force:
 			return None
 		try:
 			newClass=obj.treeInterceptorClass
 		except NotImplementedError:
 			return None
+		if not force and (
+			not config.conf['virtualBuffers']['enableOnPageLoad'] or
+			getattr(obj.appModule, "disableBrowseModeByDefault", False)
+		):
+			# Import late to avoid circular import.
+			from browseMode import BrowseModeTreeInterceptor
+			# Disabling enableOnPageLoad should only affect browse mode tree interceptors.
+			if issubclass(newClass, BrowseModeTreeInterceptor):
+				return None
 		ti=newClass(obj)
 		if not ti.isAlive:
 			return None
@@ -116,7 +126,7 @@ class TreeInterceptor(baseObject.ScriptableObject):
 					if review.getCurrentMode()=='document':
 						# if focus is in this treeInterceptor and review mode is document, turning on passThrough should force object review
 						review.setCurrentMode('object')
-					api.setNavigatorObject(focusObj)
+					api.setNavigatorObject(focusObj, isFocus=True)
 			braille.handler.handleGainFocus(api.getFocusObject())
 		else:
 			obj=api.getNavigatorObject()
@@ -133,32 +143,46 @@ class TreeInterceptor(baseObject.ScriptableObject):
 		"""Prepares this treeInterceptor so that it becomes ready to accept event/script input."""
 		raise NotImplementedError
 
-class DocumentTreeInterceptor(TreeInterceptor):
+class DocumentTreeInterceptor(documentBase.TextContainerObject,TreeInterceptor):
 	"""A TreeInterceptor that supports document review."""
 
-	def _get_TextInfo(self):
-		raise NotImplementedError
-
-	def makeTextInfo(self,position):
-		return self.TextInfo(self,position)
+	#: Indicates if the text selection is anchored at the start.
+	#: The anchored position is the end that doesn't move when extending or shrinking the selection.
+	#: For example, if you have no selection and you press shift+rightArrow to select the next character,
+	#: this will be True.
+	#: In contrast, if you have no selection and you press shift+leftArrow to select the previous character,
+	#: this will be False.
+	#: If the selection is anchored at the end or there is no information this is C{False}.
+	#: @type: bool
+	isTextSelectionAnchoredAtStart=True
 
 class RootProxyTextInfo(textInfos.TextInfo):
 
-	def __init__(self,obj,position,_rangeObj=None):
+	def __init__(self,obj,position,**kwargs):
 		super(RootProxyTextInfo,self).__init__(obj,position)
-		self.innerTextInfo=self.InnerTextInfoClass(obj.rootNVDAObject,position,_rangeObj=_rangeObj)
+		if isinstance(position,self.InnerTextInfoClass):
+			self.innerTextInfo=position
+		else:
+			self.innerTextInfo=self.InnerTextInfoClass(obj.rootNVDAObject,position,**kwargs)
 
 	def _get_InnerTextInfoClass(self):
 		return self.obj.rootNVDAObject.TextInfo
 
 	def copy(self):
-		return self.__class__(self.obj,None,_rangeObj=self.innerTextInfo._rangeObj)
+		innerCopy=self.innerTextInfo.copy()
+		return self.__class__(self.obj,innerCopy)
 
 	def _get__rangeObj(self):
 		return self.innerTextInfo._rangeObj
 
 	def _set__rangeObj(self,r):
 		self.innerTextInfo._rangeObj=r
+
+	def _get_locationText(self):
+		return self.innerTextInfo.locationText
+
+	def copyToClipboard(self):
+		return self.innerTextInfo.copyToClipboard()
 
 	def find(self,text,caseSensitive=False,reverse=False):
 		return self.innerTextInfo.find(text,caseSensitive,reverse)
@@ -193,6 +217,9 @@ class RootProxyTextInfo(textInfos.TextInfo):
 	def _get_text(self):
 		return self.innerTextInfo.text
 
+	def _get_boundingRects(self):
+		return self.innerTextInfo.boundingRects
+
 	def getTextWithFields(self,formatConfig=None):
 		return self.innerTextInfo.getTextWithFields(formatConfig=formatConfig)
 
@@ -207,3 +234,14 @@ class RootProxyTextInfo(textInfos.TextInfo):
 
 	def _get_focusableNVDAObjectAtStart(self):
 		return self.innerTextInfo.focusableNVDAObjectAtStart
+
+	def getFormatFieldSpeech(self, attrs, attrsCache=None, formatConfig=None, reason=None, unit=None, extraDetail=False , initialFormat=False, separator=None):
+		if separator is None:
+			# #6749: The default for this argument is actually speech.CHUNK_SEPARATOR,
+			# but that can't be specified as a default argument because of circular import issues.
+			import speech
+			separator = speech.CHUNK_SEPARATOR
+		return self.innerTextInfo.getFormatFieldSpeech(attrs, attrsCache=attrsCache, formatConfig=formatConfig, reason=reason, unit=unit, extraDetail=extraDetail , initialFormat=initialFormat, separator=separator)
+
+	def _get_pointAtStart(self):
+		return self.innerTextInfo.pointAtStart

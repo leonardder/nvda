@@ -1,7 +1,7 @@
 ###
 #This file is a part of the NVDA project.
 #URL: http://www.nvda-project.org/
-#Copyright 2011 NV Access Inc
+#Copyright 2011-2016 NV Access Limited
 #This program is free software: you can redistribute it and/or modify
 #it under the terms of the GNU General Public License version 2.0, as published by
 #the Free Software Foundation.
@@ -14,21 +14,8 @@
 
 Import([
 	'env',
-	'vbufBaseStaticLib',
 ])
 
-webKitBackendLib=env.SharedLibrary(
-	target="VBufBackend_webKit",
-	source=[
-		"webKit.cpp",
-	],
-	LIBS=[
-		vbufBaseStaticLib,
-		"user32",
-		"kernel32",
-		"oleacc",
-		"oleaut32",
-	],
-)
+webKitBackendLib=env.Object("webKit.cpp")
 
 Return('webKitBackendLib')

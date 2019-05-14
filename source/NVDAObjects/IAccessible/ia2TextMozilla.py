@@ -2,7 +2,7 @@
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
-#Copyright (C) 2015 NV Access Limited
+#Copyright (C) 2015-2019 NV Access Limited, Mozilla Corporation
 
 """Support for the IAccessible2 rich text model first implemented by Mozilla.
 This is now used by other applications as well.
@@ -18,6 +18,7 @@ import api
 from NVDAObjects import NVDAObject, NVDAObjectTextInfo
 from . import IA2TextTextInfo, IAccessible
 from compoundDocuments import CompoundTextInfo
+from locationHelper import RectLTWH
 
 class FakeEmbeddingTextInfo(textInfos.offsets.OffsetsTextInfo):
 
@@ -58,9 +59,20 @@ class MozillaCompoundTextInfo(CompoundTextInfo):
 	def __init__(self, obj, position):
 		super(MozillaCompoundTextInfo, self).__init__(obj, position)
 		if isinstance(position, NVDAObject):
-			# FIXME
-			position = textInfos.POSITION_CARET
-		if isinstance(position, self.__class__):
+			try:
+				self._start, self._startObj = self._findContentDescendant(position, textInfos.POSITION_FIRST)
+				self._end, self._endObj = self._findContentDescendant(position, textInfos.POSITION_LAST)
+				# This is the last character. Move to the end.
+				self._end.move(textInfos.UNIT_CHARACTER, 1)
+			except LookupError:
+				# This might be an embedded object that doesn't support text such as a graphic.
+				if position not in obj:
+					raise ValueError("Object %s not in document" % position)
+				# Use the point where this is embedded.
+				self._start = self._end = self._getEmbedding(position)
+				self._startObj = self._endObj = self._start.obj
+			self._normalizeStartAndEnd()
+		elif isinstance(position, self.__class__):
 			self._start = position._start.copy()
 			self._startObj = position._startObj
 			if position._end is position._start:
@@ -92,26 +104,9 @@ class MozillaCompoundTextInfo(CompoundTextInfo):
 			self._start = self._end = caretTi
 			self._startObj = self._endObj = caretObj
 		elif position == textInfos.POSITION_SELECTION:
-			# The caret is usually within the selection,
-			# so start from the caret for better performance/tolerance of server brokenness.
-			tempTi, tempObj = self._findContentDescendant(obj, textInfos.POSITION_CARET)
-			try:
-				tempTi = self._makeRawTextInfo(tempObj, position)
-			except RuntimeError:
-				# The caret is just before this object.
-				# There is never a selection in this case.
-				pass
-			else:
-				if tempTi.isCollapsed:
-					# No selection, but perhaps the caret is at the start of the next/previous object.
-					# This happens when you, for example, press shift+rightArrow at the end of a block.
-					# Try from the root.
-					rootTi = self._makeRawTextInfo(obj, position)
-					if not rootTi.isCollapsed:
-						# There is definitely a selection.
-						tempTi, tempObj = rootTi, obj
+			tempTi, tempObj = self._getSelectionBase()
 			if tempTi.isCollapsed:
-				# No selection, so use the caret.
+				# No selection, so return the caret.
 				self._start = self._end = tempTi
 				self._startObj = self._endObj = tempObj
 			else:
@@ -129,6 +124,46 @@ class MozillaCompoundTextInfo(CompoundTextInfo):
 			self._endObj = self._startObj
 		else:
 			raise NotImplementedError
+
+	def _getSelectionBase(self):
+		"""Get an NVDAObject and TextInfo somewhere within the selection.
+		This is just a base point to start from.
+		It will often be necessary to expand outwards and/or descend to get the complete selection.
+		"""
+		# The caret is usually within the selection,
+		# so start from the caret for better performance/tolerance of server brokenness.
+		try:
+			ti, obj = self._findContentDescendant(self.obj, textInfos.POSITION_CARET)
+		except LookupError:
+			# No caret.
+			ti = None
+		else:
+			try:
+				ti = self._makeRawTextInfo(obj, textInfos.POSITION_SELECTION)
+			except RuntimeError:
+				# The caret is just before this object.
+				# There is never a selection in this case.
+				return ti, obj
+			else:
+				if not ti.isCollapsed:
+					# There was a selection on the caret object.
+					return ti, obj
+		# At this point, we're in one of two situations:
+		# 1. There was no caret.
+		# This happens for non-navigable text; e.g. Kindle.
+		# However, this doesn't mean there's no selection.
+		# 2. There was a caret, but there was no selection on the caret object.
+		# Perhaps the caret is at the start of the next/previous object.
+		# This happens when you, for example, press shift+rightArrow at the end of a block.
+		# Try from the root.
+		rootTi = self._makeRawTextInfo(self.obj, textInfos.POSITION_SELECTION)
+		if not rootTi.isCollapsed:
+			# There is definitely a selection.
+			return rootTi, self.obj
+		if ti:
+			# No selection, but there's a caret, so return that.
+			return ti, obj
+		raise RuntimeError("No selection or caret")
 
 	def _makeRawTextInfo(self, obj, position):
 		return _getRawTextInfo(obj)(obj, position)
@@ -201,14 +236,17 @@ class MozillaCompoundTextInfo(CompoundTextInfo):
 				yield item
 			elif isinstance(item, int): # Embedded object.
 				embedded = _getEmbedded(ti.obj, item)
+				notText = _getRawTextInfo(embedded) is NVDAObjectTextInfo
 				if controlStack is not None:
 					controlField = self._getControlFieldForObject(embedded)
 					controlStack.append(controlField)
 					if controlField:
+						if notText:
+							controlField["content"] = embedded.name
 						controlField["_startOfNode"] = True
 						yield textInfos.FieldCommand("controlStart", controlField)
-				if _getRawTextInfo(embedded) is NVDAObjectTextInfo: # No text
-					yield embedded.basicText
+				if notText:
+					yield u" "
 				else:
 					for subItem in self._iterRecursiveText(self._makeRawTextInfo(embedded, textInfos.POSITION_ALL), controlStack, formatConfig):
 						yield subItem
@@ -286,11 +324,12 @@ class MozillaCompoundTextInfo(CompoundTextInfo):
 				field = controlStack.pop()
 				if field:
 					fields.append(textInfos.FieldCommand("controlEnd", None))
-					if ti.compareEndPoints(self._makeRawTextInfo(obj, textInfos.POSITION_ALL), "endToEnd") == 0:
+				if ti.compareEndPoints(self._makeRawTextInfo(obj, textInfos.POSITION_ALL), "endToEnd") == 0:
+					if field:
 						field["_endOfNode"] = True
-					else:
-						# We're not at the end of this object, which also means we're not at the end of any ancestors.
-						break
+				else:
+					# We're not at the end of this object, which also means we're not at the end of any ancestors.
+					break
 				ti = self._getEmbedding(obj)
 				obj = ti.obj
 
@@ -476,10 +515,16 @@ class MozillaCompoundTextInfo(CompoundTextInfo):
 		if not endPoint or endPoint == "start":
 			moveTi = self._start
 			moveObj = self._startObj
+			if endPoint and moveTi is self._end:
+				# We're just moving start. We don't want end to be affected.
+				moveTi = moveTi.copy()
 			moveTi.collapse()
 		elif endPoint == "end":
 			moveTi = self._end
 			moveObj = self._endObj
+			if endPoint and moveTi is self._start:
+				# We're just moving end. We don't want start to be affected.
+				moveTi = moveTi.copy()
 			moveTi.collapse(end=True)
 			if moveTi.compareEndPoints(self._makeRawTextInfo(moveObj, textInfos.POSITION_ALL), "endToEnd") == 0:
 				# We're at the end of the object, so move to the start of the next.
@@ -503,7 +548,10 @@ class MozillaCompoundTextInfo(CompoundTextInfo):
 			# Find the edge of the current unit in the requested direction.
 			moveTi, moveObj = self._findUnitEndpoints(moveTi, unit, findStart=moveBack, findEnd=not moveBack)
 
-			if not moveBack:
+			if moveBack:
+				# Collapse to the start of the previous unit.
+				moveTi.collapse()
+			else:
 				# Collapse to the start of the next unit.
 				moveTi.collapse(end=True)
 				if moveTi.compareEndPoints(self._makeRawTextInfo(moveObj, textInfos.POSITION_ALL), "endToEnd") == 0:
@@ -587,3 +635,39 @@ class MozillaCompoundTextInfo(CompoundTextInfo):
 			# No common ancestor.
 			return 1
 		return selfAncTi.compareEndPoints(otherAncTi, which)
+
+	def _get_NVDAObjectAtStart(self):
+		obj = self._startObj
+		# If the start is an embedded object that doesn't have text (e.g. graphic or math),
+		# _startObj will be the text parent that embeds it.
+		# However, we want this property to return the embedded object.
+		# This is necessary to allow interaction with math in browse mode, for example.
+		embedded = _getEmbedded(obj, self._start._startOffset)
+		if embedded:
+			return embedded
+		return obj
+
+	def _get_boundingRects(self):
+		rects = []
+		copy = self.copy()
+		obj = copy._startObj
+		ti = copy._start
+		while obj:
+			if not obj.hasIrrelevantLocation:
+				try:
+					rects.extend(ti.boundingRects)
+				except (NotImplementedError, LookupError):
+					pass
+			if obj == copy._endObj:
+				# We're at the end of the range.
+				break
+			try:
+				ti, obj = copy._findNextContent(ti)
+			except LookupError:
+				# Can't move forward any further.
+				break
+			if obj == copy._endObj:
+				# Override ti with self._end, because self._end ends at the current range's end,
+				# while the ti for self._endObj might contain text that is after the current range.
+				ti = copy._end
+		return rects

@@ -1,12 +1,13 @@
 # -*- coding: UTF-8 -*-
 #NVDAObjects/__init__.py
 #A part of NonVisual Desktop Access (NVDA)
-#Copyright (C) 2006-2016 NV Access Limited, Peter Vágner, Aleksey Sadovoy, Patrick Zajda
+#Copyright (C) 2006-2017 NV Access Limited, Peter Vágner, Aleksey Sadovoy, Patrick Zajda, Babbage B.V., Davy Kager
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
 
 """Module that contains the base NVDA object type"""
-from new import instancemethod
+
+from six import with_metaclass
 import time
 import re
 import weakref
@@ -15,7 +16,9 @@ import review
 import eventHandler
 from displayModel import DisplayModelTextInfo
 import baseObject
+import documentBase
 import speech
+import ui
 import api
 import textInfos.offsets
 import config
@@ -24,6 +27,7 @@ import appModuleHandler
 import treeInterceptorHandler
 import braille
 import globalPluginHandler
+import brailleInput
 
 class NVDAObjectTextInfo(textInfos.offsets.OffsetsTextInfo):
 	"""A default TextInfo which is used to enable text review of information about widgets that don't support text content.
@@ -44,6 +48,11 @@ class NVDAObjectTextInfo(textInfos.offsets.OffsetsTextInfo):
 	def _getTextRange(self,start,end):
 		text=self._getStoryText()
 		return text[start:end]
+
+	def _get_boundingRects(self):
+		if self.obj.hasIrrelevantLocation:
+			raise LookupError("Object is off screen, invisible or has no location")
+		return [self.obj.location,]
 
 class InvalidNVDAObject(RuntimeError):
 	"""Raised by NVDAObjects during construction to inform that this object is invalid.
@@ -67,8 +76,8 @@ class DynamicNVDAObjectType(baseObject.ScriptableObject.__class__):
 			obj.APIClass=APIClass
 			if isinstance(obj,self):
 				obj.__init__(**kwargs)
-		except InvalidNVDAObject, e:
-			log.debugWarning("Invalid NVDAObject: %s" % e, stack_info=True)
+		except InvalidNVDAObject as e:
+			log.debugWarning("Invalid NVDAObject: %s" % e, exc_info=True)
 			return None
 
 		clsList = []
@@ -103,7 +112,7 @@ class DynamicNVDAObjectType(baseObject.ScriptableObject.__class__):
 			newCls=self._dynamicClassCache.get(bases,None)
 			if not newCls:
 				name="Dynamic_%s"%"".join([x.__name__ for x in clsList])
-				newCls=type(name,bases,{})
+				newCls=type(name,bases,{"__module__": __name__})
 				self._dynamicClassCache[bases]=newCls
 
 		oldMro=frozenset(obj.__class__.__mro__)
@@ -137,7 +146,7 @@ class DynamicNVDAObjectType(baseObject.ScriptableObject.__class__):
 		"""
 		cls._dynamicClassCache.clear()
 
-class NVDAObject(baseObject.ScriptableObject):
+class NVDAObject(with_metaclass(DynamicNVDAObjectType, documentBase.TextContainerObject,baseObject.ScriptableObject)):
 	"""NVDA's representation of a single control/widget.
 	Every widget, regardless of how it is exposed by an application or the operating system, is represented by a single NVDAObject instance.
 	This allows NVDA to work with all widgets in a uniform way.
@@ -161,12 +170,21 @@ class NVDAObject(baseObject.ScriptableObject):
 	An L{AppModule} can also choose overlay classes for an instance using the L{AppModule.chooseNVDAObjectOverlayClasses} method.
 	"""
 
-	__metaclass__=DynamicNVDAObjectType
 	cachePropertiesByDefault = True
 
 	#: The TextInfo class this object should use to provide access to text.
 	#: @type: type; L{textInfos.TextInfo}
 	TextInfo=NVDAObjectTextInfo
+
+	#: Indicates if the text selection is anchored at the start.
+	#: The anchored position is the end that doesn't move when extending or shrinking the selection.
+	#: For example, if you have no selection and you press shift+rightArrow to select the next character,
+	#: this will be True.
+	#: In contrast, if you have no selection and you press shift+leftArrow to select the previous character,
+	#: this will be False.
+	#: If the selection is anchored at the end or there is no information this is C{False}.
+	#: @type: bool
+	isTextSelectionAnchoredAtStart=True
 
 	@classmethod
 	def findBestAPIClass(cls,kwargs,relation=None):
@@ -325,7 +343,7 @@ class NVDAObject(baseObject.ScriptableObject):
 	shouldCreateTreeInterceptor = True
 
 	def _get_treeInterceptor(self):
-		"""Retreaves the treeInterceptor associated with this object.
+		"""Retrieves the treeInterceptor associated with this object.
 		If a treeInterceptor has not been specifically set, the L{treeInterceptorHandler} is asked if it can find a treeInterceptor containing this object.
 		@return: the treeInterceptor
 		@rtype: L{treeInterceptorHandler.TreeInterceptor}
@@ -378,6 +396,14 @@ class NVDAObject(baseObject.ScriptableObject):
 		@rtype: int
 		"""  
 		return controlTypes.ROLE_UNKNOWN
+
+	def _get_roleText(self):
+		"""
+		A custom role string for this object, which is used for braille and speech presentation, which will override the standard label for this object's role property.
+		No string is provided by default, meaning that NVDA will fall back to using role.
+		Examples of where this property might be overridden are shapes in Powerpoint, or ARIA role descriptions.
+		"""
+		return None
 
 	def _get_value(self):
 		"""The value of this object (example: the current percentage of a scrollbar, the selected option in a combo box).
@@ -558,9 +584,21 @@ class NVDAObject(baseObject.ScriptableObject):
 		"""
 		raise NotImplementedError
 
+	def _get_rowSpan(self):
+		"""The number of rows spanned by this cell.
+		@rtype: int
+		"""
+		raise NotImplementedError
+
 	def _get_rowHeaderText(self):
 		"""The text of the row headers for this cell.
 		@rtype: str
+		"""
+		raise NotImplementedError
+
+	def _get_columnSpan(self):
+		"""The number of columns spanned by this cell.
+		@rtype: int
 		"""
 		raise NotImplementedError
 
@@ -611,7 +649,7 @@ class NVDAObject(baseObject.ScriptableObject):
 			text=self.makeTextInfo(textInfos.POSITION_ALL).text
 			return self.presType_content if text and not text.isspace() else self.presType_layout
 
-		if role in (controlTypes.ROLE_UNKNOWN, controlTypes.ROLE_PANE, controlTypes.ROLE_TEXTFRAME, controlTypes.ROLE_ROOTPANE, controlTypes.ROLE_LAYEREDPANE, controlTypes.ROLE_SCROLLPANE, controlTypes.ROLE_SECTION, controlTypes.ROLE_PARAGRAPH, controlTypes.ROLE_TITLEBAR, controlTypes.ROLE_LABEL, controlTypes.ROLE_WHITESPACE):
+		if role in (controlTypes.ROLE_UNKNOWN, controlTypes.ROLE_PANE, controlTypes.ROLE_TEXTFRAME, controlTypes.ROLE_ROOTPANE, controlTypes.ROLE_LAYEREDPANE, controlTypes.ROLE_SCROLLPANE, controlTypes.ROLE_SPLITPANE, controlTypes.ROLE_SECTION, controlTypes.ROLE_PARAGRAPH, controlTypes.ROLE_TITLEBAR, controlTypes.ROLE_LABEL, controlTypes.ROLE_WHITESPACE,controlTypes.ROLE_BORDER):
 			return self.presType_layout
 		name = self.name
 		description = self.description
@@ -621,15 +659,6 @@ class NVDAObject(baseObject.ScriptableObject):
 			if role == controlTypes.ROLE_TABLE and not config.conf["documentFormatting"]["reportTables"]:
 				return self.presType_layout
 			if role in (controlTypes.ROLE_TABLEROW,controlTypes.ROLE_TABLECOLUMN,controlTypes.ROLE_TABLECELL) and (not config.conf["documentFormatting"]["reportTables"] or not config.conf["documentFormatting"]["reportTableCellCoords"]):
-				return self.presType_layout
-		if role in (controlTypes.ROLE_TABLEROW,controlTypes.ROLE_TABLECOLUMN):
-			try:
-				table=self.table
-			except NotImplementedError:
-				table=None
-			if table:
-				# This is part of a real table, so the cells will report row/column information.
-				# Therefore, this object is just for layout.
 				return self.presType_layout
 		return self.presType_content
 
@@ -754,7 +783,14 @@ Tries to force this object to take the focus.
 		@return: True if this object is protected (hides its input for passwords), or false otherwise
 		@rtype: boolean
 		"""
-		return False
+		# Objects with the protected state, or with a role of passWordEdit should always be protected.
+		isProtected=(controlTypes.STATE_PROTECTED in self.states or self.role==controlTypes.ROLE_PASSWORDEDIT)
+		# #7908: If this object is currently protected, keep it protected for the rest of its lifetime.
+		# The most likely reason it would lose its protected state is because the object is dying.
+		# In this case it is much more secure to assume it is still protected, thus the end of PIN codes will not be accidentally reported. 
+		if isProtected:
+			self.isProtected=isProtected
+		return isProtected
 
 	def _get_indexInParent(self):
 		"""The index of this object in its parent object.
@@ -785,7 +821,7 @@ Tries to force this object to take the focus.
 		@return: C{True} if it should be presented in the focus ancestry, C{False} if not.
 		@rtype: bool
 		"""
-		if self.presentationType == self.presType_layout:
+		if self.presentationType in (self.presType_layout, self.presType_unavailable):
 			return False
 		if self.role in (controlTypes.ROLE_TREEVIEWITEM, controlTypes.ROLE_LISTITEM, controlTypes.ROLE_PROGRESSBAR, controlTypes.ROLE_EDITABLETEXT):
 			return False
@@ -798,10 +834,40 @@ Tries to force this object to take the focus.
 		"""
 		return None
 
+	def _get_isCurrent(self):
+		"""Gets the value that indicates whether this object is the current element in a set of related 
+		elements. This maps to aria-current. Normally returns None. If this object is current
+		it will return one of the following values: "true", "page", "step", "location", "date", "time"
+		"""
+		return None
+
+	def _get_shouldAcceptShowHideCaretEvent(self):
+		"""Some objects/applications send show/hide caret events when we don't expect it, such as when the cursor is blinking.
+		@return: if show/hide caret events should be accepted for this object.
+		@rtype: Boolean
+		"""
+		return True
+
 	def reportFocus(self):
 		"""Announces this object in a way suitable such that it gained focus.
 		"""
 		speech.speakObject(self,reason=controlTypes.REASON_FOCUS)
+
+	def _get_placeholder(self):
+		"""If it exists for this object get the value of the placeholder text.
+		For example this might be the aria-placeholder text for a field in a web page.
+		@return: the placeholder text else None
+		@rtype: String or None
+		"""
+		log.debug("Potential unimplemented child class: %r" %self)
+		return None
+
+	def _get_landmark(self):
+		"""If this object represents an ARIA landmark, fetches the ARIA landmark role.
+		@return: ARIA landmark role else None
+		@rtype: String or None
+		"""
+		return None
 
 	def _reportErrorInPreviousWord(self):
 		try:
@@ -828,6 +894,14 @@ Tries to force this object to take the focus.
 			return
 		import nvwave
 		nvwave.playWaveFile(r"waves\textError.wav")
+
+	def event_liveRegionChange(self):
+		"""
+		A base implementation for live region change events.
+		"""
+		name=self.name
+		if name:
+			ui.message(name)
 
 	def event_typedCharacter(self,ch):
 		if config.conf["documentFormatting"]["reportSpellingErrors"] and config.conf["keyboard"]["alertForSpellingErrors"] and (
@@ -891,6 +965,7 @@ This code is executed if a gain focus event is received by this object.
 """
 		self.reportFocus()
 		braille.handler.handleGainFocus(self)
+		brailleInput.handler.handleGainFocus(self)
 
 	def event_foreground(self):
 		"""Called when the foreground window changes.
@@ -899,10 +974,16 @@ This code is executed if a gain focus event is received by this object.
 		"""
 		speech.cancelSpeech()
 
-	def event_becomeNavigatorObject(self):
+	def event_becomeNavigatorObject(self, isFocus=False):
 		"""Called when this object becomes the navigator object.
+		@param isFocus: true if the navigator object was set due to a focus change.
+		@type isFocus: bool
 		"""
-		braille.handler.handleReviewMove()
+		# When the navigator object follows the focus and braille is auto tethered to review,
+		# we should not update braille with the new review position as a tether to focus is due.
+		if braille.handler.shouldAutoTether and isFocus:
+			return
+		braille.handler.handleReviewMove(shouldAutoTether=not isFocus)
 
 	def event_valueChange(self):
 		if self is api.getFocusObject():
@@ -922,6 +1003,7 @@ This code is executed if a gain focus event is received by this object.
 	def event_caret(self):
 		if self is api.getFocusObject() and not eventHandler.isPendingEvents("gainFocus"):
 			braille.handler.handleCaretMove(self)
+			brailleInput.handler.handleCaretMove(self)
 			review.handleCaretMove(self)
 
 	def _get_flatReviewPosition(self):
@@ -954,8 +1036,13 @@ This code is executed if a gain focus event is received by this object.
 			self._basicTextTime=newTime
 		return self._basicText
 
-	def makeTextInfo(self,position):
-		return self.TextInfo(self,position)
+	def _get__isTextEmpty(self):
+		"""
+		@return C{True} if the text contained in the object is considered empty by the underlying implementation. In most cases this will match {isCollapsed}, however some implementations may consider a single space or line feed as an empty range.
+		"""
+		ti = self.makeTextInfo(textInfos.POSITION_FIRST)
+		ti.move(textInfos.UNIT_CHARACTER, 1, endPoint="end")
+		return ti.isCollapsed
 
 	@staticmethod
 	def _formatLongDevInfoString(string, truncateLen=250):
@@ -1084,3 +1171,35 @@ This code is executed if a gain focus event is received by this object.
 	#: The language/locale of this object.
 	#: @type: basestring
 	language = None
+
+	def _get__hasNavigableText(self):
+		# The generic NVDAObjectTextInfo by itself is never enough to be navigable
+		if self.TextInfo is NVDAObjectTextInfo:
+			return False
+		role = self.role
+		states = self.states
+		if role in (controlTypes.ROLE_EDITABLETEXT,controlTypes.ROLE_TERMINAL,controlTypes.ROLE_DOCUMENT):
+			# Edit fields, terminals and documents  are always navigable
+			return True
+		elif controlTypes.STATE_EDITABLE in states:
+			# Anything that is specifically editable is navigable
+			return True
+		else:
+			return False
+
+	def _get_hasIrrelevantLocation(self):
+		"""Returns whether the location of this object is irrelevant for mouse or magnification tracking or highlighting,
+		either because it is programatically hidden (STATE_INVISIBLE), off screen or the object has no location."""
+		states = self.states
+		return controlTypes.STATE_INVISIBLE in states or controlTypes.STATE_OFFSCREEN in states or not self.location or not any(self.location)
+
+	def _get_selectionContainer(self):
+		""" An ancestor NVDAObject which manages the selection for this object and other descendants."""
+		return None
+
+	def getSelectedItemsCount(self,maxCount=2):
+		"""
+		Fetches the number of descendants currently selected.
+		For performance, this method will only count up to the given maxCount number, and if there is one more above that, then sys.maxint is returned stating that many items are selected.
+		"""
+		return 0

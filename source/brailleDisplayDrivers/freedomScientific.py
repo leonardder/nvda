@@ -2,7 +2,7 @@
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
-#Copyright (C) 2008-2011 Michael Curran <mick@kulgan.net>, James Teh <jamie@jantrid.net>
+#Copyright (C) 2008-2017 NV Access Limited
 
 from ctypes import *
 from ctypes.wintypes import *
@@ -229,12 +229,10 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver,ScriptableObject):
 	gestureMap=inputCore.GlobalGestureMap({
 		"globalCommands.GlobalCommands" : {
 			"braille_routeTo":("br(freedomScientific):routing",),
-			"braille_scrollBack" : ("br(freedomScientific):leftAdvanceBar", "br(freedomScientific]:leftBumperBarUp","br(freedomScientific):rightBumperBarUp",),
+			"braille_scrollBack" : ("br(freedomScientific):leftAdvanceBar", "br(freedomScientific):leftBumperBarUp","br(freedomScientific):rightBumperBarUp",),
 			"braille_scrollForward" : ("br(freedomScientific):rightAdvanceBar","br(freedomScientific):leftBumperBarDown","br(freedomScientific):rightBumperBarDown",),
 			"braille_previousLine" : ("br(freedomScientific):leftRockerBarUp", "br(freedomScientific):rightRockerBarUp",),
 			"braille_nextLine" : ("br(freedomScientific):leftRockerBarDown", "br(freedomScientific):rightRockerBarDown",),
-			"kb:backspace" : ("br(freedomScientific):dot7",),
-			"kb:enter" : ("br(freedomScientific):dot8",),
 			"kb:shift+tab": ("br(freedomScientific):dot1+dot2+brailleSpaceBar",),
 			"kb:tab" : ("br(freedomScientific):dot4+dot5+brailleSpaceBar",),
 			"kb:upArrow" : ("br(freedomScientific):dot1+brailleSpaceBar",),
@@ -249,6 +247,8 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver,ScriptableObject):
 			"kb:control+end" : ("br(freedomScientific):dot4+dot5+dot6+brailleSpaceBar",),
 			"kb:alt" : ("br(freedomScientific):dot1+dot3+dot4+brailleSpaceBar",),
 			"kb:alt+tab" : ("br(freedomScientific):dot2+dot3+dot4+dot5+brailleSpaceBar",),
+			"kb:alt+shift+tab" : ("br(freedomScientific):dot1+dot2+dot5+dot6+brailleSpaceBar",),
+			"kb:windows+tab" : ("br(freedomScientific):dot2+dot3+dot4+brailleSpaceBar",),
 			"kb:escape" : ("br(freedomScientific):dot1+dot5+brailleSpaceBar",),
 			"kb:windows" : ("br(freedomScientific):dot2+dot4+dot5+dot6+brailleSpaceBar",),
 			"kb:windows+d" : ("br(freedomScientific):dot1+dot2+dot3+dot4+dot5+dot6+brailleSpaceBar",),
@@ -286,7 +286,7 @@ class KeyGesture(InputGesture, brailleInput.BrailleInputGesture):
 		super(KeyGesture,self).__init__()
 		keys=[self.keyLabels[num] for num in xrange(24) if (keyBits>>num)&1]
 		extendedKeys=[self.extendedKeyLabels[num] for num in xrange(4) if (extendedKeyBits>>num)&1]
-		self.id="+".join(set(keys+extendedKeys))
+		self.id="+".join(keys+extendedKeys)
 		# Don't say is this a dots gesture if some keys either from dots and space are pressed.
 		if not extendedKeyBits and not keyBits & ~(0xff | (1 << 0xf)):
 			self.dots = keyBits & 0xff

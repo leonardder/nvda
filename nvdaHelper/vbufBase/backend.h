@@ -1,7 +1,7 @@
 /*
 This file is a part of the NVDA project.
 URL: http://www.nvda-project.org/
-Copyright 2006-2010 NVDA contributers.
+Copyright 2007-2016 NV Access Limited
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License version 2.0, as published by
     the Free Software Foundation.
@@ -31,13 +31,9 @@ typedef std::set<VBufBackend_t*> VBufBackendSet_t;
 class VBufBackend_t  : public VBufStorage_buffer_t {
 	private:
 
-	static const UINT wmRenderThreadInitialize;
-	static const UINT wmRenderThreadTerminate;
-
 /**
- * A callback to manage Initialize and termination of code in the render thread of backends.
+ * A callback to handle windows being destroyed.
  */
-	static LRESULT CALLBACK renderThread_callWndProcHook(int code, WPARAM wParam, LPARAM lParam);
 static LRESULT CALLBACK destroy_callWndProcHook(int code, WPARAM wParam, LPARAM lParam);
 
 /**
@@ -55,13 +51,18 @@ static LRESULT CALLBACK destroy_callWndProcHook(int code, WPARAM wParam, LPARAM 
  */
 	static void CALLBACK renderThread_winEventProcHook(HWINEVENTHOOK hookID, DWORD eventID, HWND hwnd, long objectID, long childID, DWORD threadID, DWORD time);
 
+	protected:
+
 /**
  * the list of control field nodes that should be re-rendered the next time the backend is updated.
- * the list is in the order the invalidations were requested.
+ * the list is in an order such that any parent is before any child. 
  */
-	VBufStorage_controlFieldNodeList_t invalidSubtreeList;
+	VBufStorage_controlFieldNodeList_t pendingInvalidSubtreesList;
 
-	protected:
+/**
+ * The list of invalid subtrees currently being re-rendered by update.
+  */
+	VBufStorage_controlFieldNodeList_t workingInvalidSubtreesList;
 
 /**
  * The set of currently running backends
@@ -151,25 +152,6 @@ static LRESULT CALLBACK destroy_callWndProcHook(int code, WPARAM wParam, LPARAM 
 	virtual void forceUpdate();
 
 /**
- * Retrieve the native handle for the object underlying a node.
- * This handle is used to retrieve the object out-of-process.
- * The way in which it is used is implementation specific.
- * @param node The node in question.
- * @return the handle or 0 on error.
- */
-	virtual int getNativeHandleForNode(VBufStorage_controlFieldNode_t*);
-
-/**
- * Retrieve a node given the native handle for its underlying object.
- * This handle identifies the object out-of-process.
- * The way in which it is used is implementation specific.
- * @param buffer the virtual buffer to use
- * @param handle the handle in question.
- * @return the node or 0 on error.
- */
-	virtual VBufStorage_controlFieldNode_t* getNodeForNativeHandle(int);
-
-/**
  * Clears the content of the backend and terminates any code used for rendering.
  */
 	virtual void terminate();
@@ -184,11 +166,28 @@ static LRESULT CALLBACK destroy_callWndProcHook(int code, WPARAM wParam, LPARAM 
  */
 	LockableObject lock;
 
+/**
+ * Fetches an existing node from this backend, so that it can be added to a temporary buffer as a reference node during a partial render.
+ * This method should only be called from within a backend's render method.
+ * If the node exists but it is currently marked for re-rendering,
+ * The node is unmarked for re-rendering, but not returned. 
+ * this allows the current render in progress (that called this method) to go ahead and re-render that node itself like it had never existed.
+  */
+	VBufStorage_controlFieldNode_t* reuseExistingNodeInRender(VBufStorage_controlFieldNode_t* parent, VBufStorage_fieldNode_t* previous, int docHandle, int ID) ;
+
 };
 
 /**
  * a function signature for the VBufBackend_create factory function all backend libraries must implement to create a backend.
  */
 typedef VBufBackend_t*(*VBufBackend_create_proc)(int,int);
+
+// The backend creation functions
+VBufBackend_t* AdobeAcrobatVBufBackend_t_createInstance(int docHandle, int ID);
+VBufBackend_t* AdobeFlashVBufBackend_t_createInstance(int docHandle, int ID);
+VBufBackend_t* GeckoVBufBackend_t_createInstance(int docHandle, int ID);
+VBufBackend_t* lotusNotesRichTextVBufBackend_t_createInstance(int docHandle, int ID);
+VBufBackend_t* MshtmlVBufBackend_t_createInstance(int docHandle, int ID);
+VBufBackend_t* WebKitVBufBackend_t_createInstance(int docHandle, int ID);
 
 #endif

@@ -1,13 +1,16 @@
 #A part of NonVisual Desktop Access (NVDA)
-#Copyright (C) 2006-2015 NVDA Contributors
+#Copyright (C) 2006-2018 NV Access Limited, Babbage B.V.
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
 
+from comtypes.automation import IEnumVARIANT, VARIANT
 from comtypes import COMError, IServiceProvider, GUID
+from comtypes.hresult import S_OK, S_FALSE
 import ctypes
 import os
 import re
 import itertools
+import importlib
 from comInterfaces.tom import ITextDocument
 import tones
 import languageHandler
@@ -31,6 +34,7 @@ from NVDAObjects import NVDAObject, NVDAObjectTextInfo, InvalidNVDAObject
 import NVDAObjects.JAB
 import eventHandler
 from NVDAObjects.behaviors import ProgressBar, Dialog, EditableTextWithAutoSelectDetection, FocusableUnfocusableContainer, ToolTip, Notification
+from locationHelper import RectLTWH
 
 def getNVDAObjectFromEvent(hwnd,objectID,childID):
 	try:
@@ -79,8 +83,12 @@ def normalizeIA2TextFormatField(formatField):
 		invalid=formatField.pop("invalid")
 	except KeyError:
 		invalid=None
-	if invalid and invalid.lower()=="spelling":
-		formatField["invalid-spelling"]=True
+	if invalid:
+		invalid=invalid.lower()
+		if invalid=="spelling":
+			formatField["invalid-spelling"]=True
+		elif invalid=="grammar":
+			formatField["invalid-grammar"]=True
 	color=formatField.get('color')
 	if color:
 		try:
@@ -111,17 +119,34 @@ class IA2TextTextInfo(textInfos.offsets.OffsetsTextInfo):
 
 	def _getOffsetFromPoint(self,x,y):
 		if self.obj.IAccessibleTextObject.nCharacters>0:
-			return self.obj.IAccessibleTextObject.OffsetAtPoint(x,y,IAccessibleHandler.IA2_COORDTYPE_SCREEN_RELATIVE)
+			offset = self.obj.IAccessibleTextObject.OffsetAtPoint(x,y,IAccessibleHandler.IA2_COORDTYPE_SCREEN_RELATIVE)
+			# IA2 specifies that a result of -1 indicates that
+			# the point is invalid or there is no character under the point.
+			# Note that Chromium does not follow the spec and returns 0 for invalid or no character points.
+			# As 0 is a valid offset, there's nothing we could do other than just returning it.
+			if offset == -1:
+				raise LookupError("Invalid point or no character under point")
+			return offset
 		else:
-			raise NotImplementedError
+			raise LookupError
 
-	def _getPointFromOffset(self,offset):
+	@classmethod
+	def _getBoundingRectFromOffsetInObject(cls,obj,offset):
 		try:
-			res=self.obj.IAccessibleTextObject.characterExtents(offset,IAccessibleHandler.IA2_COORDTYPE_SCREEN_RELATIVE)
+			res=RectLTWH(*obj.IAccessibleTextObject.characterExtents(offset,IAccessibleHandler.IA2_COORDTYPE_SCREEN_RELATIVE))
 		except COMError:
 			raise NotImplementedError
-		point=textInfos.Point(res[0]+(res[2]/2),res[1]+(res[3]/2))
-		return point
+		if not any(res[2:]):
+			# Gecko tends to return (0,0,0,0) rectangles sometimes, for example in empty text fields.
+			# Chromium could return rectangles that are positioned at the upper left corner of the object,
+			# and they have a width and height of 0.
+			# Other IA2 implementations, such as the one in LibreOffice,
+			# tend to return the caret rectangle in this case, which is ok.
+			raise LookupError
+		return res
+
+	def _getBoundingRectFromOffset(self,offset):
+		return self._getBoundingRectFromOffsetInObject(self.obj, offset)
 
 	def _get_unit_mouseChunk(self):
 		return "mouseChunk"
@@ -137,6 +162,8 @@ class IA2TextTextInfo(textInfos.offsets.OffsetsTextInfo):
 		super(IA2TextTextInfo,self).expand(unit)
 		if isMouseChunkUnit:
 			text=self._getTextRange(self._startOffset,self._endOffset)
+			if not text:
+				return
 			try:
 				self._startOffset=text.rindex(u'\ufffc',0,oldStart-self._startOffset)
 			except ValueError:
@@ -188,7 +215,7 @@ class IA2TextTextInfo(textInfos.offsets.OffsetsTextInfo):
 
 	def _getTextRange(self,start,end):
 		try:
-			return self.obj.IAccessibleTextObject.text(start,end)
+			return self.obj.IAccessibleTextObject.text(start,end) or u""
 		except COMError:
 			return u""
 
@@ -199,7 +226,7 @@ class IA2TextTextInfo(textInfos.offsets.OffsetsTextInfo):
 			log.debugWarning("could not get attributes",exc_info=True)
 			return textInfos.FormatField(),(self._startOffset,self._endOffset)
 		formatField=textInfos.FormatField()
-		if not attribsString and offset>0:
+		if attribsString is None and offset>0:
 			try:
 				attribsString=self.obj.IAccessibleTextObject.attributes(offset-1)[2]
 			except COMError:
@@ -392,7 +419,7 @@ the NVDAObject for IAccessible
 			clsList.insert(0, FocusableUnfocusableContainer)
 
 		if hasattr(self, "IAccessibleTextObject"):
-			if role==oleacc.ROLE_SYSTEM_TEXT or self.IA2States&IAccessibleHandler.IA2_STATE_EDITABLE:
+			if role==oleacc.ROLE_SYSTEM_TEXT or controlTypes.STATE_EDITABLE in self.states:
 				clsList.append(EditableTextWithAutoSelectDetection)
 
 		# Use window class name and role to search for a class match in our static map.
@@ -407,7 +434,8 @@ the NVDAObject for IAccessible
 			if classString and classString.find('.')>0:
 				modString,classString=os.path.splitext(classString)
 				classString=classString[1:]
-				mod=__import__(modString,globals(),locals(),[])
+				# #8712: Python 3 wants a dot (.) when loading a module from the same folder via relative imports, and this is done via package argument.
+				mod=importlib.import_module("NVDAObjects.IAccessible.%s"%modString, package="NVDAObjects.IAccessible")
 				newCls=getattr(mod,classString)
 			elif classString:
 				newCls=globals()[classString]
@@ -417,15 +445,22 @@ the NVDAObject for IAccessible
 		# Some special cases.
 		if windowClassName=="Frame Notification Bar" and role==oleacc.ROLE_SYSTEM_CLIENT:
 			clsList.append(IEFrameNotificationBar)
-		elif self.event_objectID==winUser.OBJID_CLIENT and self.event_childID==0 and windowClassName in ("_WwN","_WwO") and self.windowControlID==18:
-			from winword import SpellCheckErrorField
-			clsList.append(SpellCheckErrorField)
+		elif self.event_objectID==winUser.OBJID_CLIENT and self.event_childID==0 and windowClassName=="_WwG":
+			from .winword import WordDocument 
+			clsList.append(WordDocument)
+		elif self.event_objectID==winUser.OBJID_CLIENT and self.event_childID==0 and windowClassName in ("_WwN","_WwO"):
+			if self.windowControlID==18:
+				from .winword import SpellCheckErrorField
+				clsList.append(SpellCheckErrorField)
+			else:
+				from .winword import WordDocument_WwN
+				clsList.append(WordDocument_WwN)
 		elif windowClassName=="DirectUIHWND" and role==oleacc.ROLE_SYSTEM_TOOLBAR:
 			parentWindow=winUser.getAncestor(self.windowHandle,winUser.GA_PARENT)
 			if parentWindow and winUser.getClassName(parentWindow)=="Frame Notification Bar":
 				clsList.append(IENotificationBar)
 		if windowClassName.lower().startswith('mscandui'):
-			import mscandui
+			from . import mscandui
 			mscandui.findExtraOverlayClasses(self,clsList)
 		elif windowClassName=="GeckoPluginWindow" and self.event_objectID==0 and self.IAccessibleChildID==0:
 			from mozilla import GeckoPluginWindowRoot
@@ -447,7 +482,7 @@ the NVDAObject for IAccessible
 		elif windowClassName.startswith('Mozilla'):
 			from . import mozilla
 			mozilla.findExtraOverlayClasses(self, clsList)
-		elif windowClassName.startswith('bosa_sdm'):
+		elif self.event_objectID in (None,winUser.OBJID_CLIENT) and windowClassName.startswith('bosa_sdm'):
 			if role==oleacc.ROLE_SYSTEM_GRAPHIC and controlTypes.STATE_FOCUSED in self.states:
 				from .msOffice import SDMSymbols
 				clsList.append(SDMSymbols)
@@ -479,7 +514,7 @@ the NVDAObject for IAccessible
 		if windowClassName.startswith("Internet Explorer_"):
 			from . import MSHTML
 			MSHTML.findExtraIAccessibleOverlayClasses(self, clsList)
-		elif windowClassName == "AVL_AVView":
+		elif windowClassName in ("AVL_AVView", "FoxitDocWnd"):
 			from . import adobeAcrobat
 			adobeAcrobat.findExtraOverlayClasses(self, clsList)
 		elif windowClassName == "WebViewWindowClass":
@@ -504,7 +539,6 @@ the NVDAObject for IAccessible
 				pDoc=None
 			if pDoc:
 				self._ITextDocumentObject=pDoc
-				self.useITextDocumentSupport=True
 				self.editAPIVersion=2
 				from NVDAObjects.window.edit import Edit
 				clsList.append(Edit)
@@ -601,9 +635,12 @@ the NVDAObject for IAccessible
 		except COMError:
 			pass
 		try:
-			self.IAccessibleTableObject=self.IAccessibleObject.QueryInterface(IAccessibleHandler.IAccessibleTable)
+			self.IAccessibleTable2Object=self.IAccessibleObject.QueryInterface(IAccessibleHandler.IAccessibleTable2)
 		except COMError:
-			pass
+			try:
+				self.IAccessibleTableObject=self.IAccessibleObject.QueryInterface(IAccessibleHandler.IAccessibleTable)
+			except COMError:
+				pass
 		try:
 			self.IAccessibleTextObject=IAccessibleObject.QueryInterface(IAccessibleHandler.IAccessibleText)
 		except COMError:
@@ -770,7 +807,8 @@ the NVDAObject for IAccessible
 		if role==0:
 			try:
 				role=self.IAccessibleObject.accRole(self.IAccessibleChildID)
-			except COMError:
+			except COMError as e:
+				log.debugWarning("accRole failed: %s" % e)
 				role=0
 		return role
 
@@ -811,6 +849,9 @@ the NVDAObject for IAccessible
 			return states
 		IAccessible2States=self.IA2States
 		states=states|set(IAccessibleHandler.IAccessible2StatesToNVDAStates[x] for x in (y for y in (1<<z for z in xrange(32)) if y&IAccessible2States) if IAccessibleHandler.IAccessible2StatesToNVDAStates.has_key(x))
+		# Readonly should override editable
+		if controlTypes.STATE_READONLY in states:
+			states.discard(controlTypes.STATE_EDITABLE)
 		try:
 			IA2Attribs=self.IA2Attributes
 		except COMError:
@@ -885,7 +926,7 @@ the NVDAObject for IAccessible
 
 	def _get_location(self):
 		try:
-			return self.IAccessibleObject.accLocation(self.IAccessibleChildID)
+			return RectLTWH(*self.IAccessibleObject.accLocation(self.IAccessibleChildID))
 		except COMError:
 			return None
 
@@ -1022,6 +1063,8 @@ the NVDAObject for IAccessible
 		return self.correctAPIForRelation(IAccessible(IAccessibleObject=child[0], IAccessibleChildID=child[1]))
 
 	def _get_IA2Attributes(self):
+		if not isinstance(self.IAccessibleObject,IAccessibleHandler.IAccessible2):
+			return {}
 		try:
 			attribs = self.IAccessibleObject.attributes
 		except COMError as e:
@@ -1035,7 +1078,10 @@ the NVDAObject for IAccessible
 		# We currently only care about changes to the accessible drag and drop attributes, which we map to states, so treat this as a stateChange.
 		self.event_stateChange()
 
-	def _get_rowNumber(self):
+	def _get_IA2PhysicalRowNumber(self):
+		tableCell=self._IATableCell
+		if tableCell:
+			return tableCell.rowIndex+1
 		table=self.table
 		if table:
 			if self.IAccessibleTableUsesTableCellIndexAttrib:
@@ -1052,7 +1098,23 @@ the NVDAObject for IAccessible
 				log.debugWarning("IAccessibleTable::rowIndex failed", exc_info=True)
 		raise NotImplementedError
 
-	def _get_columnNumber(self):
+	def _get_rowNumber(self):
+		index=self.IA2Attributes.get('rowindex')
+		if index is None and isinstance(self.parent,IAccessible):
+			index=self.parent.IA2Attributes.get('rowindex')
+		if index is None:
+			index=self.IA2PhysicalRowNumber
+		return index
+
+	def _get_rowSpan(self):
+		if self._IATableCell:
+			return self._IATableCell.rowExtent
+		raise NotImplementedError
+
+	def _get_IA2PhysicalColumnNumber(self):
+		tableCell=self._IATableCell
+		if tableCell:
+			return tableCell.columnIndex+1
 		table=self.table
 		if table:
 			if self.IAccessibleTableUsesTableCellIndexAttrib:
@@ -1069,7 +1131,36 @@ the NVDAObject for IAccessible
 				log.debugWarning("IAccessibleTable::columnIndex failed", exc_info=True)
 		raise NotImplementedError
 
-	def _get_rowCount(self):
+	def _get_cellCoordsText(self):
+		colText=self.IA2Attributes.get('coltext')
+		rowText=self.IA2Attributes.get('rowtext')
+		if rowText is None and isinstance(self.parent,IAccessible):
+			rowText=self.parent.IA2Attributes.get('rowtext')
+		if not rowText and not colText:
+			return
+		if not colText:
+			colText=self.columnNumber
+		if not rowText:
+			rowText=self.rowNumber
+		return "%s %s"%(colText,rowText)
+
+	def _get_columnNumber(self):
+		index=self.IA2Attributes.get('colindex')
+		if index is None:
+			index=self.IA2PhysicalColumnNumber
+		return index
+
+	def _get_columnSpan(self):
+		if self._IATableCell:
+			return self._IATableCell.columnExtent
+		raise NotImplementedError
+
+	def _get_IA2PhysicalRowCount(self):
+		if hasattr(self,'IAccessibleTable2Object'):
+			try:
+				return self.IAccessibleTable2Object.nRows
+			except COMError:
+				log.debugWarning("IAccessibleTable2::nRows failed", exc_info=True)
 		if hasattr(self,'IAccessibleTableObject'):
 			try:
 				return self.IAccessibleTableObject.nRows
@@ -1077,13 +1168,30 @@ the NVDAObject for IAccessible
 				log.debugWarning("IAccessibleTable::nRows failed", exc_info=True)
 		raise NotImplementedError
 
-	def _get_columnCount(self):
+	def _get_rowCount(self):
+		count=self.IA2Attributes.get('rowcount')
+		if count is None:
+			count=self.IA2PhysicalRowCount
+		return count
+
+	def _get_IA2PhysicalColumnCount(self):
+		if hasattr(self,'IAccessibleTable2Object'):
+			try:
+				return self.IAccessibleTable2Object.nColumns
+			except COMError:
+				log.debugWarning("IAccessibleTable2::nColumns failed", exc_info=True)
 		if hasattr(self,'IAccessibleTableObject'):
 			try:
 				return self.IAccessibleTableObject.nColumns
 			except COMError:
 				log.debugWarning("IAccessibleTable::nColumns failed", exc_info=True)
 		raise NotImplementedError
+
+	def _get_columnCount(self):
+		count=self.IA2Attributes.get('colcount')
+		if count is None:
+			count=self.IA2PhysicalColumnCount
+		return count
 
 	def _get__IATableCell(self):
 		# Permanently cache the result.
@@ -1125,6 +1233,51 @@ the NVDAObject for IAccessible
 	def _get_columnHeaderText(self):
 		return self._tableHeaderTextHelper("column")
 
+	def _get_selectionContainer(self):
+		if self.table:
+			return self.table
+		return super(IAccessible,self).selectionContainer
+
+	def _getSelectedItemsCount_accSelection(self,maxCount):
+		sel=self.IAccessibleObject.accSelection
+		if not sel:
+			raise NotImplementedError
+		# accSelection can return a child ID of a simple element, for instance in QT tree tables. 
+		# Therefore treet this as a single selection.
+		if isinstance(sel,int) and sel>0:
+			return 1
+		enumObj=sel.QueryInterface(IEnumVARIANT)
+		if not enumObj:
+			raise NotImplementedError
+		# Call the rawmethod for IEnumVARIANT::Next as COMTypes' overloaded version does not allow limiting the amount of items returned
+		numItemsFetched=ctypes.c_ulong()
+		itemsBuf=(VARIANT*(maxCount+1))()
+		res=enumObj._IEnumVARIANT__com_Next(maxCount,itemsBuf,ctypes.byref(numItemsFetched))
+		# IEnumVARIANT returns S_FALSE  if the buffer is too small, although it still writes as many as it can.
+		# For our purposes, we can treat both S_OK and S_FALSE as success.
+		if res!=S_OK and res!=S_FALSE:
+			raise COMError(res,None,None)
+		return numItemsFetched.value if numItemsFetched.value<=maxCount else sys.maxint
+
+	def getSelectedItemsCount(self,maxCount):
+		# To fetch the number of selected items, we first try MSAA's accSelection, but if that fails in any way, we fall back to using IAccessibleTable2's nSelectedCells, if we are on an IAccessible2 table.
+		# Currently Chrome does not implement accSelection, thus for Google Sheets we must use nSelectedCells when on a table.
+		try:
+			return self._getSelectedItemsCount_accSelection(maxCount)
+		except (COMError,NotImplementedError) as e:
+			log.debug("Cannot fetch selected items count using accSelection, %s"%e)
+			pass
+		if hasattr(self,'IAccessibleTable2Object'):
+			try:
+				return self.IAccessibleTable2Object.nSelectedCells
+			except COMError as e:
+				log.debug("Error calling IAccessibleTable2::nSelectedCells, %s"%e)
+			pass
+		else:
+			log.debug("No means of getting a selection count from this IAccessible")
+		return super(IAccessible,self).getSelectedItemsCount(maxCount)
+
+
 	def _get_table(self):
 		if not isinstance(self.IAccessibleObject,IAccessibleHandler.IAccessible2):
 			return None
@@ -1135,10 +1288,10 @@ the NVDAObject for IAccessible
 		if self.IAccessibleTableUsesTableCellIndexAttrib and "table-cell-index" in self.IA2Attributes:
 			checkAncestors=True
 		obj=self.parent
-		while checkAncestors and obj and not hasattr(obj,'IAccessibleTableObject'):
+		while checkAncestors and obj and not hasattr(obj,'IAccessibleTable2Object') and not hasattr(obj,'IAccessibleTableObject'):
 			parent=obj.parent=obj.parent
 			obj=parent
-		if not obj or not hasattr(obj,'IAccessibleTableObject'):
+		if not obj or (not hasattr(obj,'IAccessibleTable2Object') and not hasattr(obj,'IAccessibleTableObject')):
 			return None
 		self._table=obj
 		return obj
@@ -1185,6 +1338,10 @@ the NVDAObject for IAccessible
 			try:
 				info={}
 				info["level"],info["similarItemsInGroup"],info["indexInGroup"]=self.IAccessibleObject.groupPosition
+				# Object's with an IAccessibleTableCell interface should not expose indexInGroup/similarItemsInGroup as the cell's 2d info is much more useful.
+				if self._IATableCell:
+					del info['indexInGroup']
+					del info['similarItemsInGroup']
 				# 0 means not applicable, so remove it.
 				for key, val in info.items():
 					if not val:
@@ -1257,6 +1414,9 @@ the NVDAObject for IAccessible
 		if self.role != controlTypes.ROLE_ALERT:
 			# Ignore alert events on objects that aren't alerts.
 			return
+		if not self.name and not self.description and self.childCount == 0:
+			# Don't report if there's no content.
+			return
 		# If the focus is within the alert object, don't report anything for it.
 		if eventHandler.isPendingEvents("gainFocus"):
 			# The alert event might be fired before the focus.
@@ -1300,7 +1460,9 @@ the NVDAObject for IAccessible
 
 	def _get_isPresentableFocusAncestor(self):
 		IARole = self.IAccessibleRole
-		if IARole == oleacc.ROLE_SYSTEM_CLIENT and self.windowStyle & winUser.WS_SYSMENU:
+		# This is the root object of a top level window.
+		# #4300: We check the object and child ids as well because there can be "clients" other than the root.
+		if IARole == oleacc.ROLE_SYSTEM_CLIENT and self.event_objectID==winUser.OBJID_CLIENT and self.event_childID==0 and self.windowStyle & winUser.WS_SYSMENU:
 			return True
 		return super(IAccessible, self).isPresentableFocusAncestor
 
@@ -1557,13 +1719,32 @@ class Groupbox(IAccessible):
 		self.isPresentableFocusAncestor = res = super(Groupbox, self).isPresentableFocusAncestor
 		return res
 
+CHAR_LTR_MARK = u'\u200E'
+CHAR_RTL_MARK = u'\u200F'
 class TrayClockWClass(IAccessible):
 	"""
 	Based on NVDAObject but the role is changed to clock.
+	Depending on the version of Windows name or value contains left-to-right or right-to-left characters, so remove them from both.
 	"""
 
 	def _get_role(self):
+		# On Windows 10 Anniversary update and later the text 'clock' is included in the name so having clock in the control type is redundant.
+		if super(TrayClockWClass, self).value is None:
+			return controlTypes.ROLE_BUTTON
 		return controlTypes.ROLE_CLOCK
+
+	def _get_name(self):
+	# #4364 On some versions of Windows name contains redundant information that is available either in the role or the value, however on Windows 10 Anniversary Update and later the value is empty, so we cannot simply dismiss the name.
+		if super(TrayClockWClass, self).value is None:
+			clockName = super(TrayClockWClass, self).name
+			return clockName.replace(CHAR_LTR_MARK,'').replace(CHAR_RTL_MARK,'')
+		return None
+
+	def _get_value(self):
+		clockValue = super(TrayClockWClass, self).value
+		if clockValue is not None:
+			clockValue = clockValue.replace(CHAR_LTR_MARK,'').replace(CHAR_RTL_MARK,'')
+		return clockValue
 
 class OutlineItem(IAccessible):
 
@@ -1741,7 +1922,8 @@ _staticMap={
 	(None,oleacc.ROLE_SYSTEM_ALERT):"Dialog",
 	(None,oleacc.ROLE_SYSTEM_PROPERTYPAGE):"Dialog",
 	(None,oleacc.ROLE_SYSTEM_GROUPING):"Groupbox",
-	("TrayClockWClass",oleacc.ROLE_SYSTEM_CLIENT):"TrayClockWClass",
+	("TrayClockWClass",oleacc.ROLE_SYSTEM_PUSHBUTTON):"TrayClockWClass",
+	("TrayClockWClass",oleacc.ROLE_SYSTEM_CLOCK):"TrayClockWClass",
 	("TRxRichEdit",oleacc.ROLE_SYSTEM_CLIENT):"delphi.TRxRichEdit",
 	(None,oleacc.ROLE_SYSTEM_OUTLINEITEM):"OutlineItem",
 	(None,oleacc.ROLE_SYSTEM_LIST):"List",
@@ -1785,7 +1967,9 @@ _staticMap={
 	("MSOUNISTAT",oleacc.ROLE_SYSTEM_CLIENT):"msOffice.MSOUNISTAT",
 	("QWidget",oleacc.ROLE_SYSTEM_CLIENT):"qt.Client",
 	("QWidget",oleacc.ROLE_SYSTEM_LIST):"qt.Container",
+	("Qt5QWindowIcon",oleacc.ROLE_SYSTEM_LIST):"qt.Container",
 	("QWidget",oleacc.ROLE_SYSTEM_OUTLINE):"qt.Container",
+	("Qt5QWindowIcon",oleacc.ROLE_SYSTEM_OUTLINE):"qt.Container",
 	("QWidget",oleacc.ROLE_SYSTEM_MENUBAR):"qt.Container",
 	("QWidget",oleacc.ROLE_SYSTEM_ROW):"qt.TableRow",
 	("QWidget",oleacc.ROLE_SYSTEM_CELL):"qt.TableCell",
@@ -1793,6 +1977,7 @@ _staticMap={
 	("QPopup",oleacc.ROLE_SYSTEM_MENUPOPUP):"qt.Menu",
 	("QWidget",oleacc.ROLE_SYSTEM_IPADDRESS):"qt.LayeredPane",
 	("QWidget",oleacc.ROLE_SYSTEM_APPLICATION):"qt.Application",
+	("Qt5QWindowIcon",oleacc.ROLE_SYSTEM_APPLICATION):"qt.Application",
 	("Shell_TrayWnd",oleacc.ROLE_SYSTEM_CLIENT):"Taskbar",
 	("Shell DocObject View",oleacc.ROLE_SYSTEM_CLIENT):"ShellDocObjectView",
 	("listview",oleacc.ROLE_SYSTEM_CLIENT):"ListviewPane",

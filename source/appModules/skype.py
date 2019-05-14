@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 #appModules/skype.py
 #A part of NonVisual Desktop Access (NVDA)
-#Copyright (C) 2007-2015 Peter Vágner, NV Access Limited
+#Copyright (C) 2007-2019 Peter Vágner, NV Access Limited, Babbage B.V.
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
 
@@ -160,7 +160,8 @@ class ChatOutputList(NVDAObjects.IAccessible.IAccessible):
 			ui.message(_("No message yet"))
 			return
 		message = self.getChild(count - index)
-		api.setNavigatorObject(message)
+		# Reviewing a message should not auto tether
+		api.setNavigatorObject(message, isFocus=True)
 		self.reportMessage(message.name)
 
 class Notification(NVDAObjects.behaviors.Notification):
@@ -221,6 +222,7 @@ class TypingIndicator(NVDAObjects.IAccessible.IAccessible):
 		queueHandler.queueFunction(queueHandler.eventQueue, self._maybeReport)
 
 class AppModule(appModuleHandler.AppModule):
+	disableBrowseModeByDefault = True
 
 	def __init__(self, *args, **kwargs):
 		super(AppModule, self).__init__(*args, **kwargs)

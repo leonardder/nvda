@@ -1,3 +1,9 @@
+#displayModel.py
+#A part of NonVisual Desktop Access (NVDA)
+#This file is covered by the GNU General Public License.
+#See the file COPYING for more details.
+#Copyright (C) 2006-2017 NV Access Limited, Babbage B.V.
+
 from ctypes import *
 from ctypes.wintypes import RECT
 from comtypes import BSTR
@@ -7,12 +13,18 @@ import colors
 import XMLFormatting
 import api
 import winUser
+import mouseHandler
 import NVDAHelper
 import textInfos
 from textInfos.offsets import OffsetsTextInfo
 import watchdog
 from logHandler import log
 import windowUtils
+from locationHelper import RectLTRB, RectLTWH
+
+def wcharToInt(c):
+	i=ord(c)
+	return c_short(i).value
 
 def detectStringDirection(s):
 	direction=0
@@ -168,7 +180,7 @@ def getWindowTextInRect(bindingHandle, windowHandle, left, top, right, bottom,mi
 	characterLocations = []
 	cpBufIt = iter(cpBuf)
 	for cp in cpBufIt:
-		characterLocations.append((ord(cp), ord(next(cpBufIt)), ord(next(cpBufIt)), ord(next(cpBufIt))))
+		characterLocations.append(RectLTRB(wcharToInt(cp), wcharToInt(next(cpBufIt)), wcharToInt(next(cpBufIt)), wcharToInt(next(cpBufIt))))
 	return text, characterLocations
 
 def getFocusRect(obj):
@@ -388,15 +400,6 @@ class DisplayModelTextInfo(OffsetsTextInfo):
 		if bkColor is not None:
 			field['background-color']=colors.RGB.fromCOLORREF(int(bkColor))
 
-	def _getPointFromOffset(self, offset):
-		# Returns physical coordinates.
-		rects=self._storyFieldsAndRects[1]
-		if not rects or offset>=len(rects):
-			raise LookupError
-		x,y=rects[offset][:2]
-		x,y=windowUtils.logicalToPhysicalPoint(self.obj.windowHandle,x,y)
-		return textInfos.Point(x, y)
-
 	def _getOffsetFromPoint(self, x, y):
 		# Accepts physical coordinates.
 		x,y=windowUtils.physicalToLogicalPoint(self.obj.windowHandle,x,y)
@@ -419,6 +422,13 @@ class DisplayModelTextInfo(OffsetsTextInfo):
 		d=sorted(c)
 		#Return the lowest offset with the shortest distance
 		return d[0][1] if len(d)>0 else 0
+
+	def _getBoundingRectFromOffset(self, offset):
+		# Returns physical coordinates.
+		rects=self._storyFieldsAndRects[1]
+		if not rects or offset>=len(rects):
+			raise LookupError
+		return rects[offset].toPhysical(self.obj.windowHandle).toLTWH()
 
 	def _getNVDAObjectFromOffset(self,offset):
 		try:
@@ -475,8 +485,30 @@ class DisplayModelTextInfo(OffsetsTextInfo):
 				if lineEndOffset>=self._endOffset:
 					return
 			return
-		for chunk in super(DisplayModelTextInfo,self)._getTextInChunks(unit):
+		for chunk in super(DisplayModelTextInfo,self).getTextInChunks(unit):
 			yield chunk
+
+	def _get_boundingRects(self):
+		# The base implementation for OffsetsTextInfo is conservative,
+		# However here, since bounding rectangles are always known and on screen, we can use them all.
+		lineEndOffsets = [
+			offset for offset in self._storyFieldsAndRects[2]
+			if self._startOffset < offset < self._endOffset
+		]
+		lineEndOffsets.append(self._endOffset)
+		startOffset = endOffset = self._startOffset
+		rects = []
+		for lineEndOffset in lineEndOffsets:
+			startOffset=endOffset
+			endOffset=lineEndOffset
+			rects.append(RectLTWH.fromCollection(*self._storyFieldsAndRects[1][startOffset:endOffset]).toPhysical(self.obj.windowHandle))
+		return rects
+
+	def _getFirstVisibleOffset(self):
+		return 0
+
+	def _getLastVisibleOffset(self):
+		return self._getStoryLength()
 
 class EditableTextDisplayModelTextInfo(DisplayModelTextInfo):
 
@@ -543,8 +575,8 @@ class EditableTextDisplayModelTextInfo(DisplayModelTextInfo):
 		x,y=windowUtils.logicalToPhysicalPoint(self.obj.windowHandle,x,y)
 		oldX,oldY=winUser.getCursorPos()
 		winUser.setCursorPos(x,y)
-		winUser.mouse_event(winUser.MOUSEEVENTF_LEFTDOWN,0,0,None,None)
-		winUser.mouse_event(winUser.MOUSEEVENTF_LEFTUP,0,0,None,None)
+		mouseHandler.executeMouseEvent(winUser.MOUSEEVENTF_LEFTDOWN,0,0)
+		mouseHandler.executeMouseEvent(winUser.MOUSEEVENTF_LEFTUP,0,0)
 		winUser.setCursorPos(oldX,oldY)
 
 	def _getSelectionOffsets(self):
@@ -556,5 +588,5 @@ class EditableTextDisplayModelTextInfo(DisplayModelTextInfo):
 
 	def _setSelectionOffsets(self,start,end):
 		if start!=end:
-			raise TypeError("Expanded selections not supported")
+			raise NotImplementedError("Expanded selections not supported")
 		self._setCaretOffset(start)

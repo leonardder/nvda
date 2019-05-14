@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 #setup.py
 #A part of NonVisual Desktop Access (NVDA)
-#Copyright (C) 2006-2015 NV Access Limited, Peter Vágner, Joseph Lee
+#Copyright (C) 2006-2018 NV Access Limited, Peter Vágner, Joseph Lee
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
 
@@ -114,7 +114,7 @@ class py2exe(build_exe.py2exe):
 
 	def build_manifest(self, target, template):
 		mfest, rid = build_exe.py2exe.build_manifest(self, target, template)
-		if getattr(target, "script", None) == "nvda.pyw":
+		if getattr(target, "script", "").endswith(".pyw"):
 			# This is one of the main application executables.
 			mfest = mfest[:mfest.rindex("</assembly>")]
 			mfest += MAIN_MANIFEST_EXTRA + "</assembly>"
@@ -171,7 +171,7 @@ setup(
 			"dest_base":"nvda_noUIAccess",
 			"uac_info": ("asInvoker", False),
 			"icon_resources":[(1,"images/nvda.ico")],
-			"version":"0.0.0.0",
+			"version":formatBuildVersionString(),
 			"description":"NVDA application",
 			"product_version":version,
 			"copyright":copyright,
@@ -181,7 +181,7 @@ setup(
 		{
 			"script": "nvda_slave.pyw",
 			"icon_resources": [(1,"images/nvda.ico")],
-			"version": "0.0.0.0",
+			"version":formatBuildVersionString(),
 			"description": name,
 			"product_version": version,
 			"copyright": copyright,
@@ -192,41 +192,40 @@ setup(
 			# uiAccess will be enabled at runtime if appropriate.
 			"uac_info": ("asInvoker", False),
 			"icon_resources": [(1,"images/nvda.ico")],
-			"version": "0.0.0.0",
+			"version":formatBuildVersionString(),
 			"description": "NVDA Ease of Access proxy",
 			"product_version": version,
 			"copyright": copyright,
 			"company_name": publisher,
 		},
 	],
-	service=[{
-		"modules": ["nvda_service"],
-		"icon_resources": [(1, "images/nvda.ico")],
-		"version": "0.0.0.0",
-		"description": "NVDA service",
-		"product_version": version,
-		"copyright": copyright,
-		"company_name": publisher,
-		"uac_info": ("requireAdministrator", False),
-		"cmdline_style": "pywin32",
-	}],
 	options = {"py2exe": {
 		"bundle_files": 3,
 		"excludes": ["Tkinter",
 			"serial.loopback_connection", "serial.rfc2217", "serial.serialcli", "serial.serialjava", "serial.serialposix", "serial.socket_connection"],
 		"packages": ["NVDAObjects","virtualBuffers","appModules","comInterfaces","brailleDisplayDrivers","synthDrivers"],
-		# #3368: bisect was implicitly included with Python 2.7.3, but isn't with 2.7.5.
-		# Explicitly include it so we don't break some add-ons.
-		"includes": ["nvdaBuiltin", "bisect"],
+		"includes": [
+			"nvdaBuiltin",
+			# #3368: bisect was implicitly included with Python 2.7.3, but isn't with 2.7.5.
+			"bisect",
+			# Also, the previous service executable used win32api, which some add-ons use for various purposes.
+			"win32api",
+			# #8628: include an import module for validate, which older add-ons import directly.
+			# Since configobj 5.1.0, validate is a part of the configobj package
+			# and should be imported as configobj.validate instead
+			"validate",
+		],
 	}},
 	data_files=[
 		(".",glob("*.dll")+glob("*.manifest")+["builtin.dic"]),
 		("documentation", ['../copying.txt', '../contributors.txt']),
-		("lib", glob("lib/*.dll")),
-		("lib64", glob("lib64/*.dll") + glob("lib64/*.exe")),
+		("lib/%s"%version, glob("lib/*.dll")),
+		("lib64/%s"%version, glob("lib64/*.dll") + glob("lib64/*.exe")),
+		("libArm64/%s"%version, glob("libArm64/*.dll") + glob("libArm64/*.exe")),
 		("waves", glob("waves/*.wav")),
 		("images", glob("images/*.ico")),
 		("louis/tables",glob("louis/tables/*")),
+		("COMRegistrationFixes", glob("COMRegistrationFixes/*.reg")),
 		(".", ['message.html' ])
 	] + (
 		getLocaleDataFiles()

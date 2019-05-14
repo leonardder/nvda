@@ -1,10 +1,14 @@
+# -*- coding: UTF-8 -*-
 #javaAccessBridgeHandler.py
 #A part of NonVisual Desktop Access (NVDA)
-#Copyright (C) 2006-2007 NVDA Contributors <http://www.nvda-project.org/>
+#Copyright (C) 2007-2017 NV Access Limited, Peter Vágner, Renaud Paquay, Babbage B.V.
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
 
-import Queue
+try:
+	import Queue as queue # Python 2.7 import
+except ImportError:
+	import queue # Python 3 import
 from ctypes import *
 from ctypes.wintypes import *
 import time
@@ -291,7 +295,7 @@ isRunning=False
 # the issue, we use this cache as a fallback when either getTopLevelObject or
 # getHWNDFromAccessibleContext fails.
 vmIDsToWindowHandles={}
-internalFunctionQueue=Queue.Queue(1000)
+internalFunctionQueue=queue.Queue(1000)
 internalFunctionQueue.__name__="JABHandler.internalFunctionQueue"
 
 def internalQueueFunction(func,*args,**kwargs):
@@ -494,16 +498,22 @@ class JABContext(object):
 	def getAccessibleTableInfo(self):
 		info=AccessibleTableInfo()
 		if bridgeDll.getAccessibleTableInfo(self.vmID,self.accContext,byref(info)):
-			info.jabCaption=JABContext(vmID=self.vmID,accContext=info.caption) if info.caption else None
-			info.jabSummary=JABContext(vmID=self.vmID,accContext=info.summary) if info.summary else None
-			info.jabContext=JABContext(vmID=self.vmID,accContext=info.accessibleContext) if info.accessibleContext else None
-			info.jabTable=JABContext(vmID=self.vmID,accContext=info.accessibleTable) if info.accessibleTable else None
+			# #6992: Querying the hwnd for table related objects can cause the app to crash.
+			# A table is almost certainly contained within a single hwnd,
+			# so just pass the hwnd for the querying object.
+			info.jabCaption=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.caption) if info.caption else None
+			info.jabSummary=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.summary) if info.summary else None
+			info.jabContext=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.accessibleContext) if info.accessibleContext else None
+			info.jabTable=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.accessibleTable) if info.accessibleTable else None
 			return info
 
 	def getAccessibleTableCellInfo(self,row,col):
 		info=AccessibleTableCellInfo()
 		if bridgeDll.getAccessibleTableCellInfo(self.vmID,self.accContext,row,col,byref(info)):
-			info.jabContext=JABContext(vmID=self.vmID,accContext=info.accessibleContext) if info.accessibleContext else None
+			# #6992: Querying the hwnd for table related objects can cause the app to crash.
+			# A table is almost certainly contained within a single hwnd,
+			# so just pass the hwnd for the querying object.
+			info.jabContext=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.accessibleContext) if info.accessibleContext else None
 			return info
 
 	def getAccessibleTableRow(self,index):
@@ -515,30 +525,42 @@ class JABContext(object):
 	def getAccessibleTableRowHeader(self):
 		info=AccessibleTableInfo()
 		if bridgeDll.getAccessibleTableRowHeader(self.vmID,self.accContext,byref(info)):
-			info.jabCaption=JABContext(vmID=self.vmID,accContext=info.caption) if info.caption else None
-			info.jabSummary=JABContext(vmID=self.vmID,accContext=info.summary) if info.summary else None
-			info.jabContext=JABContext(vmID=self.vmID,accContext=info.accessibleContext) if info.accessibleContext else None
-			info.jabTable=JABContext(vmID=self.vmID,accContext=info.accessibleTable) if info.accessibleTable else None
+			# #6992: Querying the hwnd for table related objects can cause the app to crash.
+			# A table is almost certainly contained within a single hwnd,
+			# so just pass the hwnd for the querying object.
+			info.jabCaption=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.caption) if info.caption else None
+			info.jabSummary=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.summary) if info.summary else None
+			info.jabContext=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.accessibleContext) if info.accessibleContext else None
+			info.jabTable=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.accessibleTable) if info.accessibleTable else None
 			return info
 
 	def getAccessibleTableRowDescription(self,row):
 		accContext=bridgeDll.getAccessibleTableRowDescription(self.vmID,self.accContext,row)
 		if accContext:
-			return JabContext(vmID=self.vmID,accContext=accContext)
+			# #6992: Querying the hwnd for table related objects can cause the app to crash.
+			# A table is almost certainly contained within a single hwnd,
+			# so just pass the hwnd for the querying object.
+			return JabContext(hwnd=self.hwnd,vmID=self.vmID,accContext=accContext)
 
 	def getAccessibleTableColumnHeader(self):
 		info=AccessibleTableInfo()
 		if bridgeDll.getAccessibleTableColumnHeader(self.vmID,self.accContext,byref(info)):
-			info.jabCaption=JABContext(vmID=self.vmID,accContext=info.caption) if info.caption else None
-			info.jabSummary=JABContext(vmID=self.vmID,accContext=info.summary) if info.summary else None
-			info.jabContext=JABContext(vmID=self.vmID,accContext=info.accessibleContext) if info.accessibleContext else None
-			info.jabTable=JABContext(vmID=self.vmID,accContext=info.accessibleTable) if info.accessibleTable else None
+			# #6992: Querying the hwnd for table related objects can cause the app to crash.
+			# A table is almost certainly contained within a single hwnd,
+			# so just pass the hwnd for the querying object.
+			info.jabCaption=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.caption) if info.caption else None
+			info.jabSummary=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.summary) if info.summary else None
+			info.jabContext=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.accessibleContext) if info.accessibleContext else None
+			info.jabTable=JABContext(hwnd=self.hwnd,vmID=self.vmID,accContext=info.accessibleTable) if info.accessibleTable else None
 			return info
 
 	def getAccessibleTableColumnDescription(self,column):
 		accContext=bridgeDll.getAccessibleTableColumnDescription(self.vmID,self.accContext,column)
 		if accContext:
-			return JabContext(vmID=self.vmID,accContext=accContext)
+			# #6992: Querying the hwnd for table related objects can cause the app to crash.
+			# A table is almost certainly contained within a single hwnd,
+			# so just pass the hwnd for the querying object.
+			return JabContext(hwnd=self.hwnd,vmID=self.vmID,accContext=accContext)
 
 	def getAccessibleKeyBindings(self):
 		bindings=AccessibleKeyBindings()

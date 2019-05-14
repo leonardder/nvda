@@ -417,6 +417,9 @@ AdobeAcrobatVBufStorage_controlFieldNode_t* AdobeAcrobatVBufBackend_t::fillVBuf(
 	}
 
 	IPDDomNode* domNode = getPDDomNode(varChild, servprov);
+	if (!domNode) {
+		LOG_DEBUGWARNING(L"Couldn't get IPDDomNode for docHandle " << docHandle << L" id " << ID);
+	}
 
 	IPDDomElement* domElement = NULL;
 	LOG_DEBUG(L"Trying to get IPDDomElement");
@@ -489,8 +492,9 @@ AdobeAcrobatVBufStorage_controlFieldNode_t* AdobeAcrobatVBufBackend_t::fillVBuf(
 	LOG_DEBUG(L"childCount is "<<childCount);
 
 	bool deletePageNum = false;
-	if (!pageNum && (pageNum = this->getPageNum(domNode)))
+	if (!pageNum && domNode && (pageNum = this->getPageNum(domNode))) {
 		deletePageNum = true;
+	}
 
 	#define addAttrsToTextNode(node) { \
 		node->addAttribute(L"language", parentNode->language); \
@@ -692,10 +696,14 @@ AdobeAcrobatVBufStorage_controlFieldNode_t* AdobeAcrobatVBufBackend_t::fillVBuf(
 		}
 
 		// Hereafter, tempNode is the text node (if any).
-		tempNode = renderText(buffer, parentNode, previousNode, domNode, domElement, useNameAsContent, parentNode->language, textFlags, pageNum);
-		if (tempNode) {
-			// There was text.
-			previousNode = tempNode;
+		if (domNode) {
+			tempNode = renderText(buffer, parentNode, previousNode, domNode, domElement, useNameAsContent, parentNode->language, textFlags, pageNum);
+			if (tempNode) {
+				// There was text.
+				previousNode = tempNode;
+			}
+		} else {
+			tempNode = NULL;
 		}
 
 		if (name)
@@ -856,15 +864,9 @@ AdobeAcrobatVBufBackend_t::~AdobeAcrobatVBufBackend_t() {
 	LOG_DEBUG(L"AdobeAcrobat backend destructor");
 }
 
-extern "C" __declspec(dllexport) VBufBackend_t* VBufBackend_create(int docHandle, int ID) {
+VBufBackend_t* AdobeAcrobatVBufBackend_t_createInstance(int docHandle, int ID) {
 	VBufBackend_t* backend=new AdobeAcrobatVBufBackend_t(docHandle,ID);
 	LOG_DEBUG(L"Created new backend at "<<backend);
 	return backend;
 }
 
-BOOL WINAPI DllMain(HINSTANCE hModule,DWORD reason,LPVOID lpReserved) {
-	if(reason==DLL_PROCESS_ATTACH) {
-		_CrtSetReportHookW2(_CRT_RPTHOOK_INSTALL,(_CRT_REPORT_HOOKW)NVDALogCrtReportHook);
-	}
-	return true;
-}

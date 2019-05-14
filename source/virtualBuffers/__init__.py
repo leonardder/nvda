@@ -3,7 +3,7 @@
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
-#Copyright (C) 2007-2015 NV Access Limited, Peter Vágner
+#Copyright (C) 2007-2017 NV Access Limited, Peter Vágner
 
 import time
 import threading
@@ -36,6 +36,7 @@ import aria
 import nvwave
 import treeInterceptorHandler
 import watchdog
+from abc import abstractmethod
 
 VBufStorage_findDirection_forward=0
 VBufStorage_findDirection_back=1
@@ -109,14 +110,16 @@ class VirtualBufferQuickNavItem(browseMode.TextInfoQuickNavItem):
 
 	@property
 	def label(self):
-		if self.itemType == "landmark":
-			attrs = self.textInfo._getControlFieldAttribs(self.vbufFieldIdentifier[0], self.vbufFieldIdentifier[1])
-			name = attrs.get("name", "")
-			if name:
-				name += " "
-			return name + aria.landmarkRoles[attrs["landmark"]]
-		else:
-			return super(VirtualBufferQuickNavItem,self).label
+		attrs = {}
+
+		def propertyGetter(prop):
+			if not attrs:
+				# Lazily fetch the attributes the first time they're needed.
+				# We do this because we don't want to do this if they're not needed at all.
+				attrs.update(self.textInfo._getControlFieldAttribs(self.vbufFieldIdentifier[0], self.vbufFieldIdentifier[1]))
+			return attrs.get(prop)
+
+		return self._getLabelForProperties(propertyGetter)
 
 	def isChild(self,parent): 
 		if self.itemType == "heading":
@@ -133,6 +136,7 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 	allowMoveToOffsetPastEnd=False #: no need for end insertion point as vbuf is not editable. 
 
 	UNIT_CONTROLFIELD = "controlField"
+	UNIT_FORMATFIELD = "formatField"
 
 	def _getControlFieldAttribs(self,  docHandle, id):
 		info = self.copy()
@@ -153,6 +157,8 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 		ID = ctypes.c_int()
 		node=VBufRemote_nodeHandle_t()
 		NVDAHelper.localLib.VBuf_locateControlFieldNodeAtOffset(self.obj.VBufHandle, offset, ctypes.byref(startOffset), ctypes.byref(endOffset), ctypes.byref(docHandle), ctypes.byref(ID),ctypes.byref(node))
+		if not any((docHandle.value, ID.value)):
+			raise LookupError("Neither docHandle nor ID found for offset %d" % offset)
 		return docHandle.value, ID.value
 
 	def _getOffsetsFromFieldIdentifier(self, docHandle, ID):
@@ -165,13 +171,18 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 		NVDAHelper.localLib.VBuf_getFieldNodeOffsets(self.obj.VBufHandle, node, ctypes.byref(start), ctypes.byref(end))
 		return start.value, end.value
 
-	def _getPointFromOffset(self,offset):
+	def _getBoundingRectFromOffset(self,offset):
 		o = self._getNVDAObjectFromOffset(offset)
-		left, top, width, height = o.location
-		return textInfos.Point(left + width / 2, top + height / 2)
+		if o.hasIrrelevantLocation:
+			raise LookupError("Object is off screen, invisible or has no location")
+		return o.location
 
 	def _getNVDAObjectFromOffset(self,offset):
-		docHandle,ID=self._getFieldIdentifierFromOffset(offset)
+		try:
+			docHandle,ID=self._getFieldIdentifierFromOffset(offset)
+		except LookupError:
+			log.debugWarning("Couldn't get NVDAObject from offset %d" % offset)
+			return None
 		return self.obj.getNVDAObjectFromIdentifier(docHandle,ID)
 
 	def _getOffsetsFromNVDAObjectInBuffer(self,obj):
@@ -218,11 +229,39 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 			return u""
 		return NVDAHelper.VBuf_getTextInRange(self.obj.VBufHandle,start,end,False) or u""
 
-	def getTextWithFields(self,formatConfig=None):
-		start=self._startOffset
-		end=self._endOffset
-		if start==end:
-			return ""
+	def _getPlaceholderAttribute(self, attrs, placeholderAttrsKey):
+		"""Gets the placeholder attribute to be used.
+		@return: The placeholder attribute when there is no content within the ControlField.
+		None when the ControlField has content.
+		@note: The content is considered empty if it holds a single space.
+		"""
+		placeholder = attrs.get(placeholderAttrsKey)
+		# For efficiency, only check if it is valid to return placeholder when we have a placeholder value to return.
+		if not placeholder:
+			return None
+		# Get the start and end offsets for the field. This can be used to check if the field has any content.
+		try:
+			start, end = self._getOffsetsFromFieldIdentifier(
+				int(attrs.get('controlIdentifier_docHandle')),
+				int(attrs.get('controlIdentifier_ID')))
+		except (LookupError, ValueError):
+			log.debugWarning("unable to get offsets used to fetch content")
+			return placeholder
+		else:
+			valueLen = end - start
+			if not valueLen: # value is empty, use placeholder
+				return placeholder
+			# Because fetching the content of the field could result in a large amount of text
+			# we only do it in order to check for space.
+			# We first compare the length by comparing the offsets, if the length is less than 2 (ie
+			# could hold space)
+			if valueLen < 2:
+				controlFieldText = self.obj.makeTextInfo(textInfos.offsets.Offsets(start, end)).text
+				if not controlFieldText or controlFieldText == ' ':
+					return placeholder
+		return None
+
+	def _getFieldsInRange(self,start,end):
 		text=NVDAHelper.VBuf_getTextInRange(self.obj.VBufHandle,start,end,True)
 		if not text:
 			return ""
@@ -235,6 +274,13 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 				elif isinstance(field,textInfos.FormatField):
 					commandList[index].field=self._normalizeFormatField(field)
 		return commandList
+
+	def getTextWithFields(self,formatConfig=None):
+		start=self._startOffset
+		end=self._endOffset
+		if start==end:
+			return ""
+		return self._getFieldsInRange(start,end)
 
 	def _getWordOffsets(self,offset):
 		#Use VBuf_getBufferLineOffsets with out screen layout to find out the range of the current field
@@ -260,6 +306,12 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 		tableLayout=attrs.get('table-layout')
 		if tableLayout:
 			attrs['table-layout']=tableLayout=="1"
+
+		# convert some table attributes to ints
+		for attr in ("table-id","table-rownumber","table-columnnumber","table-rowsspanned","table-columnsspanned"):
+			attrVal=attrs.get(attr)
+			if attrVal is not None:
+				attrs[attr]=int(attrVal)
 
 		isHidden=attrs.get('isHidden')
 		if isHidden:
@@ -294,6 +346,10 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 		return attrs
 
 	def _normalizeFormatField(self, attrs):
+		strippedCharsFromStart = attrs.get("strippedCharsFromStart")
+		if strippedCharsFromStart is not None:
+			assert strippedCharsFromStart.isdigit(), "strippedCharsFromStart isn't a digit, %r" % strippedCharsFromStart
+			attrs["strippedCharsFromStart"] = int(strippedCharsFromStart)
 		return attrs
 
 	def _getLineNumFromOffset(self, offset):
@@ -310,6 +366,12 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 			ID=ctypes.c_int()
 			node=VBufRemote_nodeHandle_t()
 			NVDAHelper.localLib.VBuf_locateControlFieldNodeAtOffset(self.obj.VBufHandle,offset,ctypes.byref(startOffset),ctypes.byref(endOffset),ctypes.byref(docHandle),ctypes.byref(ID),ctypes.byref(node))
+			return startOffset.value,endOffset.value
+		elif unit == self.UNIT_FORMATFIELD:
+			startOffset=ctypes.c_int()
+			endOffset=ctypes.c_int()
+			node=VBufRemote_nodeHandle_t()
+			NVDAHelper.localLib.VBuf_locateTextFieldNodeAtOffset(self.obj.VBufHandle,offset,ctypes.byref(startOffset),ctypes.byref(endOffset),ctypes.byref(node))
 			return startOffset.value,endOffset.value
 		return super(VirtualBufferTextInfo, self)._getUnitOffsets(unit, offset)
 
@@ -344,6 +406,12 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 		self.rootIdentifiers[self.rootDocHandle, self.rootID] = self
 
 	def prepare(self):
+		if not self.rootNVDAObject.appModule.helperLocalBindingHandle:
+			# #5758: If NVDA starts with a document already in focus, there will have been no focus event to inject nvdaHelper yet.
+			# So at very least don't try to prepare a virtualBuffer as it will fail.
+			# The user will most likely need to manually move focus away and back again to allow this virtualBuffer to work. 
+			log.debugWarning("appModule has no binding handle to injected code, can't prepare virtualBuffer yet.")
+			return
 		self.shouldPrepare=False
 		self.loadBuffer()
 
@@ -366,6 +434,8 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 
 	def _loadBuffer(self):
 		try:
+			if log.isEnabledFor(log.DEBUG):
+				startTime = time.time()
 			self.VBufHandle=NVDAHelper.localLib.VBuf_createBuffer(self.rootNVDAObject.appModule.helperLocalBindingHandle,self.rootDocHandle,self.rootID,unicode(self.backendName))
 			if not self.VBufHandle:
 				raise RuntimeError("Could not remotely create virtualBuffer")
@@ -373,6 +443,10 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 			log.error("", exc_info=True)
 			queueHandler.queueFunction(queueHandler.eventQueue, self._loadBufferDone, success=False)
 			return
+		if log.isEnabledFor(log.DEBUG):
+			log.debug("Buffer load took %.3f sec, %d chars" % (
+				time.time() - startTime,
+				NVDAHelper.localLib.VBuf_getTextLength(self.VBufHandle)))
 		queueHandler.queueFunction(queueHandler.eventQueue, self._loadBufferDone)
 
 	def _loadBufferDone(self, success=True):
@@ -427,6 +501,7 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 				break
 		return tableLayout
 
+	@abstractmethod
 	def getNVDAObjectFromIdentifier(self, docHandle, ID):
 		"""Retrieve an NVDAObject for a given node identifier.
 		Subclasses must override this method.
@@ -439,6 +514,7 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 		"""
 		raise NotImplementedError
 
+	@abstractmethod
 	def getIdentifierFromNVDAObject(self,obj):
 		"""Retreaves the virtualBuffer field identifier from an NVDAObject.
 		@param obj: the NVDAObject to retreave the field identifier from.
@@ -501,22 +577,11 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 			yield VirtualBufferQuickNavItem(nodeType,self,node,startOffset.value,endOffset.value)
 			offset=startOffset
 
-	def _getTableCellCoords(self, info):
-		if info.isCollapsed:
-			info = info.copy()
-			info.expand(textInfos.UNIT_CHARACTER)
-		for field in reversed(info.getTextWithFields()):
-			if not (isinstance(field, textInfos.FieldCommand) and field.command == "controlStart"):
-				# Not a control field.
-				continue
-			attrs = field.field
-			if "table-id" in attrs and "table-rownumber" in attrs:
-				break
-		else:
-			raise LookupError("Not in a table cell")
-		return (int(attrs["table-id"]),
-			int(attrs["table-rownumber"]), int(attrs["table-columnnumber"]),
-			int(attrs.get("table-rowsspanned", 1)), int(attrs.get("table-columnsspanned", 1)))
+	def _getTableCellAt(self,tableID,startPos,row,column):
+		try:
+			return next(self._iterTableCells(tableID,row=row,column=column))
+		except StopIteration:
+			raise LookupError
 
 	def _iterTableCells(self, tableID, startPos=None, direction="next", row=None, column=None):
 		attrs = {"table-id": [str(tableID)]}
@@ -533,19 +598,6 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 			yield item.textInfo
 
 	def _getNearestTableCell(self, tableID, startPos, origRow, origCol, origRowSpan, origColSpan, movement, axis):
-		if not axis:
-			# First or last.
-			if movement == "first":
-				startPos = None
-				direction = "next"
-			elif movement == "last":
-				startPos = self.makeTextInfo(textInfos.POSITION_LAST)
-				direction = "previous"
-			try:
-				return next(self._iterTableCells(tableID, startPos=startPos, direction=direction))
-			except StopIteration:
-				raise LookupError
-
 		# Determine destination row and column.
 		destRow = origRow
 		destCol = origCol
@@ -561,8 +613,8 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 		# Optimisation: Try searching for exact destination coordinates.
 		# This won't work if they are covered by a cell spanning multiple rows/cols, but this won't be true in the majority of cases.
 		try:
-			return next(self._iterTableCells(tableID, row=destRow, column=destCol))
-		except StopIteration:
+			return self._getTableCellAt(tableID,startPos,destRow,destCol)
+		except LookupError:
 			pass
 
 		# Cells are grouped by row, so in most cases, we simply need to search in the right direction.
@@ -590,54 +642,6 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 			else:
 				raise LookupError
 
-	def _tableMovementScriptHelper(self, movement="next", axis=None):
-		if isScriptWaiting():
-			return
-		formatConfig=config.conf["documentFormatting"].copy()
-		formatConfig["reportTables"]=True
-		formatConfig["includeLayoutTables"]=True
-		try:
-			tableID, origRow, origCol, origRowSpan, origColSpan = self._getTableCellCoords(self.selection)
-		except LookupError:
-			# Translators: The message reported when a user attempts to use a table movement command
-			# when the cursor is not within a table.
-			ui.message(_("Not in a table cell"))
-			return
-
-		try:
-			info = self._getNearestTableCell(tableID, self.selection, origRow, origCol, origRowSpan, origColSpan, movement, axis)
-		except LookupError:
-			# Translators: The message reported when a user attempts to use a table movement command
-			# but the cursor can't be moved in that direction because it is at the edge of the table.
-			ui.message(_("Edge of table"))
-			# Retrieve the cell on which we started.
-			info = next(self._iterTableCells(tableID, row=origRow, column=origCol))
-
-		speech.speakTextInfo(info,formatConfig=formatConfig,reason=controlTypes.REASON_CARET)
-		info.collapse()
-		self.selection = info
-
-	def script_nextRow(self, gesture):
-		self._tableMovementScriptHelper(axis="row", movement="next")
-	# Translators: the description for the next table row script on virtualBuffers.
-	script_nextRow.__doc__ = _("moves to the next table row")
-
-
-	def script_previousRow(self, gesture):
-		self._tableMovementScriptHelper(axis="row", movement="previous")
-	# Translators: the description for the previous table row script on virtualBuffers.
-	script_previousRow.__doc__ = _("moves to the previous table row")
-
-	def script_nextColumn(self, gesture):
-		self._tableMovementScriptHelper(axis="column", movement="next")
-	# Translators: the description for the next table column script on virtualBuffers.
-	script_nextColumn.__doc__ = _("moves to the next table column")
-
-	def script_previousColumn(self, gesture):
-		self._tableMovementScriptHelper(axis="column", movement="previous")
-	# Translators: the description for the previous table column script on virtualBuffers.
-	script_previousColumn.__doc__ = _("moves to the previous table column")
-
 	def _isSuitableNotLinkBlock(self,range):
 		return (range._endOffset-range._startOffset)>=self.NOT_LINK_BLOCK_MIN_LEN
 
@@ -652,7 +656,7 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 		containerField=None
 		while controlFields:
 			field=controlFields.pop()
-			if field.getPresentationCategory(controlFields,formatConfig)==field.PRESCAT_CONTAINER:
+			if field.getPresentationCategory(controlFields,formatConfig)==field.PRESCAT_CONTAINER or field.get("landmark"):
 				containerField=field
 				break
 		if not containerField: return None
@@ -671,6 +675,9 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 	def _handleUpdate(self):
 		"""Handle an update to this buffer.
 		"""
+		if not self.VBufHandle:
+			# #4859: The buffer was unloaded after this method was queued.
+			return
 		braille.handler.handleUpdate(self)
 
 	def getControlFieldForNVDAObject(self, obj):
@@ -687,11 +694,29 @@ class VirtualBuffer(browseMode.BrowseModeDocumentTreeInterceptor):
 				return item.field
 		raise LookupError
 
+	def _isNVDAObjectInApplication_noWalk(self, obj):
+		inApp = super(VirtualBuffer, self)._isNVDAObjectInApplication_noWalk(obj)
+		if inApp is not None:
+			return inApp
+		# If the object is in the buffer, it's definitely not in an application.
+		try:
+			docHandle, objId = self.getIdentifierFromNVDAObject(obj)
+		except:
+			log.debugWarning("getIdentifierFromNVDAObject failed. "
+				"Object probably died while walking ancestors.", exc_info=True)
+			return None
+		node = VBufRemote_nodeHandle_t()
+		if not self.VBufHandle:
+			return None
+		try:
+			NVDAHelper.localLib.VBuf_getControlFieldNodeWithIdentifier(self.VBufHandle, docHandle, objId,ctypes.byref(node))
+		except WindowsError:
+			return None
+		if node:
+			return False
+		return None
+
 	__gestures = {
 		"kb:NVDA+f5": "refreshBuffer",
 		"kb:NVDA+v": "toggleScreenLayout",
-		"kb:control+alt+downArrow": "nextRow",
-		"kb:control+alt+upArrow": "previousRow",
-		"kb:control+alt+rightArrow": "nextColumn",
-		"kb:control+alt+leftArrow": "previousColumn",
 	}

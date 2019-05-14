@@ -1,3 +1,9 @@
+#logHandler.py
+#A part of NonVisual Desktop Access (NVDA)
+#Copyright (C) 2007-2018 NV Access Limited, Rui Batista, Joseph Lee
+#This file is covered by the GNU General Public License.
+#See the file COPYING for more details.
+
 """Utilities and classes to manage logging in NVDA"""
 
 import os
@@ -6,12 +12,14 @@ import sys
 import warnings
 from encodings import utf_8
 import logging
+# #7105: Python 3 split the following into two dictionaries.
 from logging import _levelNames as levelNames
 import inspect
 import winsound
 import traceback
-from types import MethodType
+from types import MethodType, FunctionType
 import globalVars
+import buildVersion
 
 ERROR_INVALID_WINDOW_HANDLE = 1400
 ERROR_TIMEOUT = 1460
@@ -23,6 +31,17 @@ CO_E_OBJNOTCONNECTED = -2147220995
 EVENT_E_ALL_SUBSCRIBERS_FAILED = -2147220991
 RPC_E_CALL_REJECTED = -2147418111
 RPC_E_DISCONNECTED = -2147417848
+LOAD_WITH_ALTERED_SEARCH_PATH=0x8
+
+def isPathExternalToNVDA(path):
+	""" Checks if the given path is external to NVDA (I.e. not pointing to built-in code). """
+	if path[0] != "<" and os.path.isabs(path) and not path.startswith(sys.path[0] + "\\"):
+		# This module is external because:
+		# the code comes from a file (fn doesn't begin with "<");
+		# it has an absolute file path (code bundled in binary builds reports relative paths); and
+		# it is not part of NVDA's Python code (not beneath sys.path[0]).
+		return True
+	return False
 
 def getCodePath(f):
 	"""Using a frame object, gets its module path (relative to the current directory).[className.[funcName]]
@@ -32,11 +51,7 @@ def getCodePath(f):
 	@rtype: string
 	"""
 	fn=f.f_code.co_filename
-	if fn[0] != "<" and os.path.isabs(fn) and not fn.startswith(sys.path[0] + "\\"):
-		# This module is external because:
-		# the code comes from a file (fn doesn't begin with "<");
-		# it has an absolute file path (code bundled in binary builds reports relative paths); and
-		# it is not part of NVDA's Python code (not beneath sys.path[0]).
+	if isPathExternalToNVDA(fn):
 		path="external:"
 	else:
 		path=""
@@ -51,12 +66,33 @@ def getCodePath(f):
 	#Code borrowed from http://mail.python.org/pipermail/python-list/2000-January/020141.html
 	if f.f_code.co_argcount:
 		arg0=f.f_locals[f.f_code.co_varnames[0]]
-		try:
-			attr=getattr(arg0,funcName)
-		except:
-			attr=None
-		if attr and type(attr) is MethodType and attr.im_func.func_code is f.f_code:
-			className=arg0.__class__.__name__
+		# #6122: Check if this function is a member of its first argument's class (and specifically which base class if any) 
+		# Rather than an instance member of its first argument.
+		# This stops infinite recursions if fetching data descriptors,
+		# And better reflects the actual source code definition.
+		topCls=arg0 if isinstance(arg0,type) else type(arg0)
+		# find the deepest class this function's name is reachable as a method from
+		if hasattr(topCls,funcName):
+			for cls in topCls.__mro__:
+				member=cls.__dict__.get(funcName)
+				if not member:
+					continue
+				memberType=type(member)
+				if memberType is FunctionType and member.func_code is f.f_code:
+					# the function was found as a standard method
+					className=cls.__name__
+				elif memberType is classmethod and type(member.__func__) is FunctionType and member.__func__.func_code is f.f_code:
+					# function was found as a class method
+					className=cls.__name__
+				elif memberType is property:
+					if type(member.fget) is FunctionType and member.fget.func_code is f.f_code:
+						# The function was found as a property getter
+						className=cls.__name__
+					elif type(member.fset) is FunctionType and member.fset.func_code is f.f_code:
+						# the function was found as a property setter
+						className=cls.__name__
+				if className:
+					break
 	return ".".join([x for x in path,className,funcName if x])
 
 # Function to strip the base path of our code from traceback text to improve readability.
@@ -79,6 +115,7 @@ class Logger(logging.Logger):
 	# Our custom levels.
 	IO = 12
 	DEBUGWARNING = 15
+	OFF = 100
 
 	def _log(self, level, msg, args, exc_info=None, extra=None, codepath=None, activateLogViewer=False, stack_info=None):
 		if not extra:
@@ -133,7 +170,7 @@ class Logger(logging.Logger):
 		self._log(log.IO, msg, args, **kwargs)
 
 	def exception(self, msg="", exc_info=True, **kwargs):
-		"""Log an exception at an appropriate levle.
+		"""Log an exception at an appropriate level.
 		Normally, it will be logged at level "ERROR".
 		However, certain exceptions which aren't considered errors (or aren't errors that we can fix) are expected and will therefore be logged at a lower level.
 		"""
@@ -161,17 +198,19 @@ class RemoteHandler(logging.Handler):
 
 	def __init__(self):
 		#Load nvdaHelperRemote.dll but with an altered search path so it can pick up other dlls in lib
-		h=ctypes.windll.kernel32.LoadLibraryExW(os.path.abspath(ur"lib\nvdaHelperRemote.dll"),0,0x8)
-		self._remoteLib=ctypes.WinDLL("nvdaHelperRemote",handle=h) if h else None
+		path=os.path.abspath(os.path.join(u"lib",buildVersion.version,u"nvdaHelperRemote.dll"))
+		h=ctypes.windll.kernel32.LoadLibraryExW(path,0,LOAD_WITH_ALTERED_SEARCH_PATH)
+		if not h:
+			raise OSError("Could not load %s"%path) 
+		self._remoteLib=ctypes.WinDLL("nvdaHelperRemote",handle=h)
 		logging.Handler.__init__(self)
 
 	def emit(self, record):
 		msg = self.format(record)
-		if self._remoteLib:
-			try:
-				self._remoteLib.nvdaControllerInternal_logMessage(record.levelno, ctypes.windll.kernel32.GetCurrentProcessId(), msg)
-			except WindowsError:
-				pass
+		try:
+			self._remoteLib.nvdaControllerInternal_logMessage(record.levelno, ctypes.windll.kernel32.GetCurrentProcessId(), msg)
+		except WindowsError:
+			pass
 
 class FileHandler(logging.StreamHandler):
 
@@ -187,11 +226,8 @@ class FileHandler(logging.StreamHandler):
 		logging.StreamHandler.close(self)
 
 	def handle(self,record):
-		# versionInfo must be imported after the language is set. Otherwise, strings won't be in the correct language.
-		# Therefore, don't import versionInfo if it hasn't already been imported.
-		versionInfo = sys.modules.get("versionInfo")
 		# Only play the error sound if this is a test version.
-		shouldPlayErrorSound = versionInfo and versionInfo.isTestVersion
+		shouldPlayErrorSound =  buildVersion.isTestVersion
 		if record.levelno>=logging.CRITICAL:
 			try:
 				winsound.PlaySound("SystemHand",winsound.SND_ALIAS)
@@ -279,13 +315,18 @@ def initialize(shouldDoRemoteLogging=False):
 	global log
 	logging.addLevelName(Logger.DEBUGWARNING, "DEBUGWARNING")
 	logging.addLevelName(Logger.IO, "IO")
+	logging.addLevelName(Logger.OFF, "OFF")
 	if not shouldDoRemoteLogging:
-		logFormatter=Formatter("%(levelname)s - %(codepath)s (%(asctime)s):\n%(message)s", "%H:%M:%S")
-		if globalVars.appArgs.secure:
+		# This produces log entries such as the following:
+		# IO - inputCore.InputManager.executeGesture (09:17:40.724):
+		# Input: kb(desktop):v
+		logFormatter=Formatter("%(levelname)s - %(codepath)s (%(asctime)s.%(msecs)03d):\n%(message)s", "%H:%M:%S")
+		if (globalVars.appArgs.secure or globalVars.appArgs.noLogging) and (not globalVars.appArgs.debugLogging and globalVars.appArgs.logLevel == 0):
 			# Don't log in secure mode.
+			# #8516: also if logging is completely turned off.
 			logHandler = logging.NullHandler()
 			# There's no point in logging anything at all, since it'll go nowhere.
-			log.setLevel(100)
+			log.setLevel(Logger.OFF)
 		else:
 			if not globalVars.appArgs.logFileName:
 				globalVars.appArgs.logFileName = _getDefaultLogFilePath()
@@ -313,14 +354,16 @@ def initialize(shouldDoRemoteLogging=False):
 def setLogLevelFromConfig():
 	"""Set the log level based on the current configuration.
 	"""
-	if globalVars.appArgs.logLevel != 0 or globalVars.appArgs.secure:
+	if globalVars.appArgs.debugLogging or globalVars.appArgs.logLevel != 0 or globalVars.appArgs.secure or globalVars.appArgs.noLogging:
 		# Log level was overridden on the command line or we're running in secure mode,
 		# so don't set it.
 		return
 	import config
 	levelName=config.conf["general"]["loggingLevel"]
 	level = levelNames.get(levelName)
-	if not level or level > log.INFO:
+	# The lone exception to level higher than INFO is "OFF" (100).
+	# Setting a log level to something other than options found in the GUI is unsupported.
+	if level not in (log.DEBUG, log.IO, log.DEBUGWARNING, log.INFO, log.OFF):
 		log.warning("invalid setting for logging level: %s" % levelName)
 		level = log.INFO
 		config.conf["general"]["loggingLevel"] = levelNames[log.INFO]
