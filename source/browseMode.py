@@ -262,6 +262,10 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 	def _get_currentNVDAObject(self):
 		raise NotImplementedError
 
+	def _get_currentFocusableNVDAObject(self):
+		return self.makeTextInfo(textInfos.POSITION_CARET).focusableNVDAObjectAtStart
+
+
 	def event_treeInterceptor_gainFocus(self):
 		"""Triggered when this browse mode interceptor gains focus.
 		This event is only fired upon entering this treeInterceptor when it was not the current treeInterceptor before.
@@ -497,14 +501,13 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 	script_activatePosition.__doc__ = _("Activates the current object in the document")
 
 	def _focusLastFocusableObject(self, activatePosition=False):
-		obj = self._lastFocusableObj
-		if not obj:
-			return
+		obj = self.currentFocusableNVDAObject
 		if obj!=self.rootNVDAObject and self._shouldSetFocusToObj(obj) and obj!= api.getFocusObject():
 			obj.setFocus()
 			speech.speakObject(obj,controlTypes.REASON_ONLYCACHE)
 		if activatePosition:
-			self._activatePosition(obj=obj)
+			# Make sure we activate the object at the caret, which is not necessarily focusable.
+			self._activatePosition()
 
 	def script_passThrough(self,gesture):
 		if not config.conf["virtualBuffers"]["autoFocusFocusableElements"]:
@@ -1159,7 +1162,6 @@ class BrowseModeDocumentTreeInterceptor(documentBase.DocumentWithTableNavigation
 		self._lastProgrammaticScrollTime = None
 		self.documentConstantIdentifier = self.documentConstantIdentifier
 		self._lastFocusObj = None
-		self._lastFocusableObj = None
 		self._hadFirstGainFocus = False
 		self._enteringFromOutside = True
 		# We need to cache this because it will be unavailable once the document dies.
@@ -1262,7 +1264,6 @@ class BrowseModeDocumentTreeInterceptor(documentBase.DocumentWithTableNavigation
 		if reason == controlTypes.REASON_FOCUS:
 			self._lastCaretMoveWasFocus = True
 			focusObj = api.getFocusObject()
-			self._lastFocusableObj = None
 			if focusObj==self.rootNVDAObject:
 				return
 		else:
@@ -1278,8 +1279,6 @@ class BrowseModeDocumentTreeInterceptor(documentBase.DocumentWithTableNavigation
 			if followBrowseModeFocus:
 				if focusObj and not eventHandler.isPendingEvents("gainFocus") and focusObj!=self.rootNVDAObject and focusObj != api.getFocusObject() and self._shouldSetFocusToObj(focusObj):
 					focusObj.setFocus()
-			else:
-				self._lastFocusableObj = focusObj
 			obj.scrollIntoView()
 			if self.programmaticScrollMayFireEvent:
 				self._lastProgrammaticScrollTime = time.time()
@@ -1519,13 +1518,14 @@ class BrowseModeDocumentTreeInterceptor(documentBase.DocumentWithTableNavigation
 				# This focus change was caused by a virtual caret movement, so don't speak the focused node to avoid double speaking.
 				# However, we still want to update the speech property cache so that property changes will be spoken properly.
 				speech.speakObject(obj,controlTypes.REASON_ONLYCACHE)
+				currentFocusableObj = self.currentFocusableNVDAObject
 				if (
 					not config.conf["virtualBuffers"]["autoFocusFocusableElements"]
-					and self._lastFocusableObj
-					and obj == self._lastFocusableObj
-					and obj is not self._lastFocusableObj
+					and currentFocusableObj
+					and obj == currentFocusableObj
+					and obj is not currentFocusableObj
 				):
-					speech.speakObject(self._lastFocusableObj,controlTypes.REASON_CHANGE)
+					speech.speakObject(currentFocusableObj,controlTypes.REASON_CHANGE)
 			else:
 				self._replayFocusEnteredEvents()
 				return nextHandler()
