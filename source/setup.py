@@ -66,20 +66,6 @@ def getModuleExtention(thisModType):
 			return ext
 	raise ValueError("unknown mod type %s"%thisModType)
 
-# py2exe's idea of whether a dll is a system dll appears to be wrong sometimes, so monkey patch it.
-origIsSystemDLL = build_exe.isSystemDLL
-def isSystemDLL(pathname):
-	dll = os.path.basename(pathname).lower()
-	if dll in ("msvcp71.dll", "msvcp90.dll", "gdiplus.dll","mfc71.dll", "mfc90.dll"):
-		# These dlls don't exist on many systems, so make sure they're included.
-		return 0
-	elif dll.startswith("api-ms-win-") or dll in ("powrprof.dll", "mpr.dll", "crypt32.dll"):
-		# These are definitely system dlls available on all systems and must be excluded.
-		# Including them can cause serious problems when a binary build is run on a different version of Windows.
-		return 1
-	return origIsSystemDLL(pathname)
-build_exe.isSystemDLL = isSystemDLL
-
 class py2exe(build_exe.py2exe):
 	"""Overridden py2exe command to:
 		* Add a command line option --enable-uiAccess to enable uiAccess for the main executable
