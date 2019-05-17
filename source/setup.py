@@ -14,7 +14,7 @@ import py2exe as py2exeModule
 from glob import glob
 import fnmatch
 from versionInfo import *
-from py2exe import build_exe
+from py2exe import distutils_buildexe
 import wx
 import imp
 
@@ -66,19 +66,19 @@ def getModuleExtention(thisModType):
 			return ext
 	raise ValueError("unknown mod type %s"%thisModType)
 
-class py2exe(build_exe.py2exe):
+class py2exe(distutils_buildexe.py2exe):
 	"""Overridden py2exe command to:
 		* Add a command line option --enable-uiAccess to enable uiAccess for the main executable
 		* Add extra info to the manifest
 		* Don't copy w9xpopen, as NVDA will never run on Win9x
 	"""
 
-	user_options = build_exe.py2exe.user_options + [
+	user_options = distutils_buildexe.py2exe.user_options + [
 		("enable-uiAccess", "u", "enable uiAccess for the main executable"),
 	]
 
 	def initialize_options(self):
-		build_exe.py2exe.initialize_options(self)
+		super(py2exe, self).initialize_options()
 		self.enable_uiAccess = False
 
 	def copy_w9xpopen(self, modules, dlls):
@@ -96,10 +96,10 @@ class py2exe(build_exe.py2exe):
 			target = dist.windows[3]
 			target["uac_info"] = (target["uac_info"][0], True)
 
-		build_exe.py2exe.run(self)
+		super(py2exe, self).run()
 
 	def build_manifest(self, target, template):
-		mfest, rid = build_exe.py2exe.build_manifest(self, target, template)
+		mfest, rid = super(py2exe, self).build_manifest(self, target, template)
 		if getattr(target, "script", "").endswith(".pyw"):
 			# This is one of the main application executables.
 			mfest = mfest[:mfest.rindex("</assembly>")]
