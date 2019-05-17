@@ -236,7 +236,7 @@ def NVDADistGenerator(target, source, env, for_signature):
 		.format(version=version, publisher=publisher, updateVersionType=updateVersionType,version_build=version_build))]
 
 	buildCmd = ["cd", source[0].path, "&&",
-		sys.executable]
+		"py", "-3"]
 	if release:
 		buildCmd.append("-O")
 	buildCmd.extend(("setup.py", "build", "--build-base", buildDir.abspath,
