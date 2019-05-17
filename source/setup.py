@@ -16,6 +16,7 @@ import fnmatch
 from versionInfo import *
 from py2exe import distutils_buildexe
 import wx
+import sourceEnv
 import imp
 
 MAIN_MANIFEST_EXTRA = r"""
@@ -81,9 +82,6 @@ class py2exe(distutils_buildexe.py2exe):
 		super(py2exe, self).initialize_options()
 		self.enable_uiAccess = False
 
-	def copy_w9xpopen(self, modules, dlls):
-		pass
-
 	def run(self):
 		dist = self.distribution
 		if self.enable_uiAccess:
@@ -99,7 +97,7 @@ class py2exe(distutils_buildexe.py2exe):
 		super(py2exe, self).run()
 
 	def build_manifest(self, target, template):
-		mfest, rid = super(py2exe, self).build_manifest(self, target, template)
+		mfest, rid = super(py2exe, self).build_manifest(target, template)
 		if getattr(target, "script", "").endswith(".pyw"):
 			# This is one of the main application executables.
 			mfest = mfest[:mfest.rindex("</assembly>")]
@@ -156,7 +154,7 @@ setup(
 			"script":"nvda.pyw",
 			"dest_base":"nvda_noUIAccess",
 			"uac_info": ("asInvoker", False),
-			"icon_resources":[(1,"images/nvda.ico")],
+			#"icon_resources":[(1,"images/nvda.ico")],
 			"version":formatBuildVersionString(),
 			"description":"NVDA application",
 			"product_version":version,
@@ -166,7 +164,7 @@ setup(
 		# The nvda_uiAccess target will be added at runtime if required.
 		{
 			"script": "nvda_slave.pyw",
-			"icon_resources": [(1,"images/nvda.ico")],
+			#"icon_resources": [(1,"images/nvda.ico")],
 			"version":formatBuildVersionString(),
 			"description": name,
 			"product_version": version,
@@ -177,7 +175,7 @@ setup(
 			"script": "nvda_eoaProxy.pyw",
 			# uiAccess will be enabled at runtime if appropriate.
 			"uac_info": ("asInvoker", False),
-			"icon_resources": [(1,"images/nvda.ico")],
+			#"icon_resources": [(1,"images/nvda.ico")],
 			"version":formatBuildVersionString(),
 			"description": "NVDA Ease of Access proxy",
 			"product_version": version,
@@ -192,14 +190,8 @@ setup(
 		"packages": ["NVDAObjects","virtualBuffers","appModules","comInterfaces","brailleDisplayDrivers","synthDrivers"],
 		"includes": [
 			"nvdaBuiltin",
-			# #3368: bisect was implicitly included with Python 2.7.3, but isn't with 2.7.5.
-			"bisect",
-			# Also, the previous service executable used win32api, which some add-ons use for various purposes.
+			# The previous service executable used win32api, which some add-ons use for various purposes.
 			"win32api",
-			# #8628: include an import module for validate, which older add-ons import directly.
-			# Since configobj 5.1.0, validate is a part of the configobj package
-			# and should be imported as configobj.validate instead
-			"validate",
 		],
 	}},
 	data_files=[
@@ -216,8 +208,20 @@ setup(
 	] + (
 		getLocaleDataFiles()
 		+ getRecursiveDataFiles("synthDrivers", "synthDrivers",
-			excludes=("*%s" % sourceModExtention, "*%s" % compiledModExtention, "*.exp", "*.lib", "*.pdb"))
-		+ getRecursiveDataFiles("brailleDisplayDrivers", "brailleDisplayDrivers", excludes=("*%s"%sourceModExtention,"*%s"%compiledModExtention))
+			excludes=(
+				"*%s" % sourceModExtention,
+				"*%s" % compiledModExtention,
+				"*.exp",
+				"*.lib",
+				"*.pdb",
+				"__pycache__"
+		))
+		+ getRecursiveDataFiles("brailleDisplayDrivers", "brailleDisplayDrivers",
+			excludes=(
+				"*%s"%sourceModExtention,
+				"*%s"%compiledModExtention,
+				"__pycache__"
+		))
 		+ getRecursiveDataFiles('documentation', '../user_docs', excludes=('*.t2t', '*.t2tconf', '*/developerGuide.*'))
 	),
 )
