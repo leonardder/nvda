@@ -4,9 +4,10 @@
 #See the file COPYING for more details.
 #Copyright (C) 2018 NV Access Limited, Babbage B.V.
 
-"""Wrapper for the windows magnification library (magnification.dll)"""
+"""Wrapper for the windows magnification library (magnification.dll)
+"""
 
-from ctypes import Structure, windll, byref, c_int, c_float, POINTER, WINFUNCTYPE
+from ctypes import Structure, windll, byref, c_int, c_float, POINTER, WINFUNCTYPE, WinError
 from ctypes.wintypes import BOOL, HWND, RECT, DWORD
 from comtypes import GUID
 
@@ -36,7 +37,7 @@ class MAGCOLOREFFECT(Structure):
 
 def errCheck(result, func, args):
 	if result == 0:
-		return result
+		raise WinError()
 	return args
 
 magnification = windll.magnification
@@ -105,9 +106,11 @@ try:
 	SetFullscreenUseBitmapSmoothing = MagSetFullscreenUseBitmapSmoothingFuncType(("MagSetFullscreenUseBitmapSmoothing", magnification), MagSetFullscreenUseBitmapSmoothingArgTypes)
 	SetFullscreenUseBitmapSmoothing.errcheck = errCheck
 except AttributeError:
-	SetFullscreenUseBitmapSmoothing = lambda HWND, useSmoothing: False
+	def SetFullscreenUseBitmapSmoothing(HWND, useSmoothing):
+		raise NotImplementedError
 try:
 	SetLensUseBitmapSmoothing = MagSetLensUseBitmapSmoothingFuncType(("MagSetLensUseBitmapSmoothing", magnification), MagSetLensUseBitmapSmoothingArgTypes)
 	SetLensUseBitmapSmoothing.errcheck = errCheck
 except AttributeError:
-	SetLensUseBitmapSmoothing = lambda useSmoothing: False
+	def SetLensUseBitmapSmoothing(useSmoothing):
+		raise NotImplementedError
