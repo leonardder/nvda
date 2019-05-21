@@ -2,11 +2,11 @@
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
-#Copyright (C) 2018 NV Access Limited
+#Copyright (C) 2018 NV Access Limited, Babbage B.V.
 
 """Screen curtain implementation based on the windows magnification API."""
 
-from vision import ColorEnhancer, ColorTransformationInfo, ROLE_MAGNIFIER, ROLE_HIGHLIGHTER
+from vision.colorEnhancerBase import ColorEnhancer, ColorTransformationInfo
 import winVersion
 try:
 	import winMagnification
@@ -33,7 +33,6 @@ class VisionEnhancementProvider(ColorEnhancer):
 	# Translators: Description of a vision enhancement provider that disables output to the screen,
 	# making it black.
 	description = _("Screen Curtain")
-	conflictingRoles = frozenset([ROLE_MAGNIFIER, ROLE_HIGHLIGHTER])
 
 	def __init__(self, *roles):
 		winMagnification.Initialize()
