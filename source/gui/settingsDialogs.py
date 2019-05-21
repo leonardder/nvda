@@ -1177,13 +1177,20 @@ class DriverSettingsMixin(object):
 			self.makeSettings(self.settingsSizer)
 		super(DriverSettingsMixin,self).onPanelActivated()
 
-class VoiceSettingsPanel(DriverSettingsMixin, SettingsPanel):
+def driverSettingsPanelFactory(driver):
+	"""Creates a driver settings panel for a driver instance."""
+	if callable(driver):
+		driverFunc = driver
+		driver = property(lambda self: driverFunc())
+	return type(
+		"DriverSettingsPanel",
+		(DriverSettingsMixin, SettingsPanel),
+		{"driver": driver}
+	)
+
+class VoiceSettingsPanel(driverSettingsPanelFactory(getSynth)):
 	# Translators: This is the label for the voice settings panel.
 	title = _("Voice")
-
-	@property
-	def driver(self):
-		return getSynth()
 
 	def makeSettings(self, settingsSizer):
 		# Construct synthesizer settings

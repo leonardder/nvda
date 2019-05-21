@@ -8,23 +8,22 @@
 
 from vision.colorEnhancerBase import ColorEnhancer, ColorTransformationInfo
 import winVersion
-try:
-	import winMagnification
-except AttributeError:
-	if not winVersion.isFullScreenMagnificationAvailable():
-		raise RuntimeError("This module is only supported on Windows 8 and above")
-	raise
 from ctypes import byref
 from collections import OrderedDict
 
-TRANSFORM_BLACK = winMagnification.MAGCOLOREFFECT()
-TRANSFORM_BLACK.transform[4][4] = 1.0
-TRANSFORM_DEFAULT = winMagnification.MAGCOLOREFFECT()
-TRANSFORM_DEFAULT.transform[0][0] = 1.0
-TRANSFORM_DEFAULT.transform[1][1] = 1.0
-TRANSFORM_DEFAULT.transform[2][2] = 1.0
-TRANSFORM_DEFAULT.transform[3][3] = 1.0
-TRANSFORM_DEFAULT.transform[4][4] = 1.0
+try:
+	import winMagnification
+except AttributeError:
+	winMagnification = None
+else:
+	TRANSFORM_BLACK = winMagnification.MAGCOLOREFFECT()
+	TRANSFORM_BLACK.transform[4][4] = 1.0
+	TRANSFORM_DEFAULT = winMagnification.MAGCOLOREFFECT()
+	TRANSFORM_DEFAULT.transform[0][0] = 1.0
+	TRANSFORM_DEFAULT.transform[1][1] = 1.0
+	TRANSFORM_DEFAULT.transform[2][2] = 1.0
+	TRANSFORM_DEFAULT.transform[3][3] = 1.0
+	TRANSFORM_DEFAULT.transform[4][4] = 1.0
 
 class VisionEnhancementProvider(ColorEnhancer):
 	"""Screen curtain implementation based on the windows magnification API.
@@ -33,6 +32,10 @@ class VisionEnhancementProvider(ColorEnhancer):
 	# Translators: Description of a vision enhancement provider that disables output to the screen,
 	# making it black.
 	description = _("Screen Curtain")
+
+	@classmethod
+	def check(cls):
+		return winVersion.isFullScreenMagnificationAvailable()
 
 	def __init__(self, *roles):
 		winMagnification.Initialize()
