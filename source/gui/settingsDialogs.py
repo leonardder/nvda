@@ -3065,7 +3065,7 @@ class VisionProviderSelectionDialog(SettingsDialog):
 
 		# Sort the state in order for roles set to None will be uninitialized first.
 		for name, roles in sorted(self._state.items()):
-			if roles and not vision.handler.setProvider(name, *roles):
+			if roles and not vision.handler.setProvider(name, roles):
 				# Translators: This message is presented when
 				# NVDA is unable to load selected
 				# vision enhancement provider.
