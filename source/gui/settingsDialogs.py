@@ -2930,7 +2930,6 @@ class VisionProviderSelectionDialog(SettingsDialog):
 		self.providerNames = [provider[0] for provider in providerList]
 		providerChoices = [provider[1] for provider in providerList]
 		self.providerSupportedRolesList = [provider[2] for provider in providerList]
-		self.providerConflictingRolesList = [provider[3] for provider in providerList]
 		self.providerList.Clear()
 		self.providerList.Items=providerChoices
 		self.syncProviderCheckboxes()
@@ -2991,15 +2990,6 @@ class VisionProviderSelectionDialog(SettingsDialog):
 		role = self.providerSupportedRolesList[self.providerList.Selection][index]
 		isChecked = self.rolesList.IsChecked(index)
 		if isChecked:
-			# Process conflicting roles
-			for item in self.providerList.CheckedItems:
-				name = self.providerNames[item]
-				for conflict in self.providerConflictingRolesList[item]:
-					if conflict is role:
-						self._state[None] |= self._state[name]
-						self._state[name].clear()
-					elif conflict not in self.providerSupportedRolesList[self.providerList.Selection]:
-						self.changeRoleInState(conflict, newProvider=None)
 			self.changeRoleInState(role, newProvider=providerName)
 		else:
 			self.changeRoleInState(role, oldProvider=providerName, newProvider=None)
