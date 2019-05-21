@@ -2883,7 +2883,7 @@ class VisionSettingsPanel(SettingsPanel):
 class VisionProviderSelectionDialog(SettingsDialog):
 	# Translators: This is the label for the vision provider selection dialog.
 	title = _("Select Vision Providers")
-	availableRoles = tuple(role for role in vision.ROLE_TO_CLASS_MAP.iterkeys())
+	availableRoles = tuple(role for role in vision.ROLE_DESCRIPTIONS.iterkeys())
 
 	def changeRoleInState(self, role, oldProvider=None, newProvider=None):
 		if not oldProvider:
