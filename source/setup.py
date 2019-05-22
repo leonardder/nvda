@@ -15,6 +15,7 @@ from glob import glob
 import fnmatch
 from versionInfo import *
 from py2exe import distutils_buildexe
+from py2exe.dllfinder import DllFinder
 import wx
 import sourceEnv
 import imp
@@ -66,6 +67,17 @@ def getModuleExtention(thisModType):
 		if modType==thisModType:
 			return ext
 	raise ValueError("unknown mod type %s"%thisModType)
+
+# py2exe's idea of whether a dll is a system dll appears to be wrong sometimes, so monkey patch it.
+orig_determine_dll_type = DllFinder.determine_dll_type
+def determine_dll_type(self, imagename):
+	dll = os.path.basename(imagename).lower()
+	if dll.startswith("api-ms-win-") or dll in ("powrprof.dll", "mpr.dll", "crypt32.dll"):
+		# These are definitely system dlls available on all systems and must be excluded.
+		# Including them can cause serious problems when a binary build is run on a different version of Windows.
+		return None
+	return orig_determine_dll_type(self, imagename)
+DllFinder.determine_dll_type = determine_dll_type
 
 class py2exe(distutils_buildexe.py2exe):
 	"""Overridden py2exe command to:
@@ -154,7 +166,7 @@ setup(
 			"script":"nvda.pyw",
 			"dest_base":"nvda_noUIAccess",
 			"uac_info": ("asInvoker", False),
-			#"icon_resources":[(1,"images/nvda.ico")],
+			"icon_resources":[(1,"images/nvda.ico")],
 			"version":formatBuildVersionString(),
 			"description":"NVDA application",
 			"product_version":version,
@@ -164,7 +176,7 @@ setup(
 		# The nvda_uiAccess target will be added at runtime if required.
 		{
 			"script": "nvda_slave.pyw",
-			#"icon_resources": [(1,"images/nvda.ico")],
+			"icon_resources": [(1,"images/nvda.ico")],
 			"version":formatBuildVersionString(),
 			"description": name,
 			"product_version": version,
@@ -175,7 +187,7 @@ setup(
 			"script": "nvda_eoaProxy.pyw",
 			# uiAccess will be enabled at runtime if appropriate.
 			"uac_info": ("asInvoker", False),
-			#"icon_resources": [(1,"images/nvda.ico")],
+			"icon_resources": [(1,"images/nvda.ico")],
 			"version":formatBuildVersionString(),
 			"description": "NVDA Ease of Access proxy",
 			"product_version": version,
