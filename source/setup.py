@@ -163,6 +163,7 @@ setup(
 			"other_resources": [], # Populated at run time
 			"version":formatBuildVersionString(),
 			"description":"NVDA application",
+			"product_name":name,
 			"product_version":version,
 			"copyright":copyright,
 			"company_name":publisher,
@@ -175,6 +176,7 @@ setup(
 			"other_resources": [], # Populated at run time
 			"version":formatBuildVersionString(),
 			"description": name,
+			"product_name":name,
 			"product_version": version,
 			"copyright": copyright,
 			"company_name": publisher,
@@ -187,6 +189,7 @@ setup(
 			"other_resources": [], # Populated at run time
 			"version":formatBuildVersionString(),
 			"description": "NVDA Ease of Access proxy",
+			"product_name":name,
 			"product_version": version,
 			"copyright": copyright,
 			"company_name": publisher,
