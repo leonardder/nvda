@@ -20,46 +20,21 @@ import wx
 import sourceEnv
 import imp
 
-MAIN_MANIFEST_EXTRA = r"""
-<file name="brailleDisplayDrivers\handyTech\HtBrailleDriverServer.dll">
-	<comClass
-		description="HtBrailleDriver Class"
-		clsid="{209445BA-92ED-4AB2-83EC-F24ACEE77EE0}"
-		threadingModel="Apartment"
-		progid="HtBrailleDriverServer.HtBrailleDriver"
-		tlbid="{33257EFB-336F-4680-B94E-F5013BA6B9B3}" />
-</file>
-<file name="brailleDisplayDrivers\handyTech\HtBrailleDriverServer.tlb">
-	<typelib tlbid="{33257EFB-336F-4680-B94E-F5013BA6B9B3}"
-		version="1.0"
-		helpdir="" />
-</file>
-<comInterfaceExternalProxyStub
-	name="IHtBrailleDriverSink"
-	iid="{EF551F82-1C7E-421F-963D-D9D03548785A}"
-	proxyStubClsid32="{00020420-0000-0000-C000-000000000046}"
-	baseInterface="{00000000-0000-0000-C000-000000000046}"
-	tlbid="{33257EFB-336F-4680-B94E-F5013BA6B9B3}" />
-<comInterfaceExternalProxyStub
-	name="IHtBrailleDriver"
-	iid="{43A71F9B-58EE-42D4-B58E-0F9FBA28D995}"
-	proxyStubClsid32="{00020424-0000-0000-C000-000000000046}"
-	baseInterface="{00000000-0000-0000-C000-000000000046}"
-	tlbid="{33257EFB-336F-4680-B94E-F5013BA6B9B3}" />
-<compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
-	<application>
-		<!-- Windows Vista -->
-		<supportedOS Id="{e2011457-1546-43c5-a5fe-008deee3d3f0}"/>
-		<!-- Windows 7 -->
-		<supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}"/>
-		<!-- Windows 8 -->
-		<supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/>
-		<!-- Windows 8.1 -->
-		<supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/>
-		<!-- Windows 10 -->
-		<supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
-	</application> 
-</compatibility>
+RT_MANIFEST = 24
+manifest_template = r"""\
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+	<trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+		<security>
+			<requestedPrivileges>
+				<requestedExecutionLevel
+					level={level}
+					uiAccess="{uiAccess}">
+				</requestedExecutionLevel>
+			</requestedPrivileges>
+		</security>
+	</trustInfo>
+</assembly>
 """
 
 def getModuleExtention(thisModType):
@@ -82,8 +57,6 @@ DllFinder.determine_dll_type = determine_dll_type
 class py2exe(distutils_buildexe.py2exe):
 	"""Overridden py2exe command to:
 		* Add a command line option --enable-uiAccess to enable uiAccess for the main executable
-		* Add extra info to the manifest
-		* Don't copy w9xpopen, as NVDA will never run on Win9x
 	"""
 
 	user_options = distutils_buildexe.py2exe.user_options + [
