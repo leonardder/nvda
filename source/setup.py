@@ -21,19 +21,39 @@ import sourceEnv
 import imp
 
 RT_MANIFEST = 24
-manifest_template = r"""\
+manifest_template = """\
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
 	<trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
 		<security>
 			<requestedPrivileges>
 				<requestedExecutionLevel
-					level={level}
-					uiAccess="{uiAccess}">
-				</requestedExecutionLevel>
+					level="asInvoker"
+					uiAccess="%(uiAccess)s"
+				/>
 			</requestedPrivileges>
 		</security>
 	</trustInfo>
+	<compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+		<application>
+			<!-- Windows 7 -->
+			<supportedOS
+				Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}"
+			/>
+			<!-- Windows 8 -->
+			<supportedOS
+				Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"
+			/>
+			<!-- Windows 8.1 -->
+			<supportedOS
+				Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"
+			/>
+			<!-- Windows 10 -->
+			<supportedOS
+				Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"
+			/>
+		</application> 
+	</compatibility>
 </assembly>
 """
 
@@ -73,21 +93,21 @@ class py2exe(distutils_buildexe.py2exe):
 			# Add a target for nvda_uiAccess, using nvda_noUIAccess as a base.
 			target = copy.deepcopy(dist.windows[0])
 			target["dest_base"] = "nvda_uiAccess"
-			target["uac_info"] = (target["uac_info"][0], True)
+			target['uiAccess'] = True
 			dist.windows.insert(1, target)
 			# nvda_eoaProxy should have uiAccess.
 			target = dist.windows[3]
-			target["uac_info"] = (target["uac_info"][0], True)
-
+			target['uiAccess'] = True
+		# Add a manifest resource to every target at runtime.
+		for target in dist.windows:
+			target["other_resources"] = [
+				(
+					RT_MANIFEST,
+					1,
+					(manifest_template % dict(uiAccess=target['uiAccess'])).encode("utf-8")
+				),
+			]
 		super(py2exe, self).run()
-
-	def build_manifest(self, target, template):
-		mfest, rid = super(py2exe, self).build_manifest(target, template)
-		if getattr(target, "script", "").endswith(".pyw"):
-			# This is one of the main application executables.
-			mfest = mfest[:mfest.rindex("</assembly>")]
-			mfest += MAIN_MANIFEST_EXTRA + "</assembly>"
-		return mfest, rid
 
 def getLocaleDataFiles():
 	wxDir=wx.__path__[0]
@@ -138,8 +158,9 @@ setup(
 		{
 			"script":"nvda.pyw",
 			"dest_base":"nvda_noUIAccess",
-			"uac_info": ("asInvoker", False),
+			"uiAccess": False,
 			"icon_resources":[(1,"images/nvda.ico")],
+			"other_resources": [], # Populated at run time
 			"version":formatBuildVersionString(),
 			"description":"NVDA application",
 			"product_version":version,
@@ -149,7 +170,9 @@ setup(
 		# The nvda_uiAccess target will be added at runtime if required.
 		{
 			"script": "nvda_slave.pyw",
+			"uiAccess": False,
 			"icon_resources": [(1,"images/nvda.ico")],
+			"other_resources": [], # Populated at run time
 			"version":formatBuildVersionString(),
 			"description": name,
 			"product_version": version,
@@ -159,8 +182,9 @@ setup(
 		{
 			"script": "nvda_eoaProxy.pyw",
 			# uiAccess will be enabled at runtime if appropriate.
-			"uac_info": ("asInvoker", False),
+			"uiAccess": False,
 			"icon_resources": [(1,"images/nvda.ico")],
+			"other_resources": [], # Populated at run time
 			"version":formatBuildVersionString(),
 			"description": "NVDA Ease of Access proxy",
 			"product_version": version,
