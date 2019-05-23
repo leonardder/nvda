@@ -1,0 +1,17 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+scons = {version = "==3.0.5",editable = true}
+
+[packages]
+pyserial = {version = "==3.4",editable = true}
+comtypes = {version = "==1.1.7",editable = true}
+configobj = {ref = "5b5de48a53cbceced3172bcd569ba7b2df7bfe6f",git = "https://github.com/DiffSK/configobj.git",editable = true}
+wxpython = "==4.0.3"
+pypubsub = "~=3.3.0"
+
+[requires]
+python_version = "2.7"
