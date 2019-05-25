@@ -181,11 +181,11 @@ class ScintillaTextInfo(textInfos.offsets.OffsetsTextInfo):
 			return unicode(buf.value, errors="replace", encoding=locale.getlocale()[1])
 
 	def _getWordOffsets(self,offset):
-		start=watchdog.cancellableSendMessage(self.obj.windowHandle,SCI_WORDSTARTPOSITION,offset,0)
-		end=watchdog.cancellableSendMessage(self.obj.windowHandle,SCI_WORDENDPOSITION,start,0)
-		if end<=offset:
-			start=end
-			end=watchdog.cancellableSendMessage(self.obj.windowHandle,SCI_WORDENDPOSITION,offset,0)
+		start = watchdog.cancellableSendMessage(self.obj.windowHandle, SCI_WORDSTARTPOSITION, offset, True)
+		end = min(
+			watchdog.cancellableSendMessage(self.obj.windowHandle, SCI_WORDENDPOSITION, start, True) + 1,
+			self._getStoryLength()
+		)
 		return [start,end]
 
 	def _getLineNumFromOffset(self,offset):
