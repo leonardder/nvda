@@ -51,7 +51,7 @@ for k,v in COM_INTERFACES.items():
 		# This buillds a .pyc file as well.
 		Dir('comInterfaces').File(k + "c")]
 	source=clsid=majorVersion=None
-	if isinstance(v,basestring):
+	if isinstance(v, str):
 		env.comtypesInterface(targets,v)
 	else:
 		env.comtypesInterface(targets,Dir('comInterfaces').File('__init__.py'),clsid=v[0],majorVersion=v[1],minorVersion=v[2])
