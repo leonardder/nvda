@@ -192,7 +192,7 @@ def setLanguage(lang):
 		curLang="en"
 	trans.install()
 	# Install our pgettext function.
-	builtins.__dict__["pgettext"] = makePgettext(trans)
+	__builtin__.__dict__["pgettext"] = makePgettext(trans)
 
 def getLanguage():
 	return curLang
