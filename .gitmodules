@@ -40,6 +40,3 @@
 [submodule "include/py2exe"]
 	path = include/py2exe
 	url = https://github.com/nvaccess/py2exe-bin
-[submodule "include/pywin32"]
-	path = include/pywin32
-	url = https://github.com/nvaccess/pywin32-bin
