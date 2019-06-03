@@ -2,7 +2,31 @@ What's New in NVDA
 
 
 %!includeconf: ../changes.t2tconf
+
+= threshold release =
+
+== Changes for Developers ==
+ - Updated pySerial to version 3.4
+- the validate module is now only available from configobj. Code should now do from configobj import validate rather than import validate.
+- textInfos.Point and textInfos.Rect are removed and replaced by locationHelper.Point and locationHelper.RectLTRB, respectively 
+- braille.BrailleHandler._get/set_tether have been removed. use getTether and setTether respectively.
+- config.getConfigDirs has been removed
+- config.ConfigManager.getConfigValidationParameter is removed. A bug in getConfigValidation has been fixed in order for it being able to fully replace getConfigValidationParameter
+- inputCore.InputGesture.logIdentifier property has been removed. Now use inputCore.InputGesture.identifiers[0] instead.
+- speakText and speakCharacter methods on synthDriver objects are no longer supported. this functionality is handled by SynthDriver.speak now.
+- SynthSetting classes in synthDriverHandler have been removed. Now use driverHandler.DriverSetting classes instead.
+- As NVDA no longer depends on pyWin32, modules such as win32api and win32con are no longer available to add-ons. win32api calls can be replaced with direct calls to win32 dll functions via ctypes, and win32con constants should be defined at the top of your files. (#9639)
+
+
+= 2019.3 =
+
+== New Features ==
+- Added a command to show the replacement for the symbol under the review cursor. (#9286)
+- Added an experimental option to the Advanced Settings panel that allows you to try out a new, work-in-progress rewrite of NVDA's Windows Console support using the Microsoft UI Automation API. (#9614)
+
+
 = 2019.2 =
+Highlights of this release include auto detection of Freedom Scientific braille displays, an experimental setting in the Advanced panel to stop browse mode from automatically moving focus (which may provide performance improvements), a rate boost option for the Windows OneCore synthesizer to achieve very fast rates, and many other bug fixes.
 
 == New Features ==
 - The find dialog now includes a history of the last 20 searches. (#8482)
@@ -24,8 +48,6 @@ What's New in NVDA
  - Browse mode keystrokes are slow to respond.
 - For braille display drivers that support it, driver settings can now be changed from the braille settings category in NVDA's settings dialog. (#7452)
 - Freedom Scientific braille displays are now supported by braille display auto detection. (#7727)
-- Added a command to show the replacement for the symbol under the review cursor. (#9286)
-- Added an experimental option to the Advanced Settings panel that allows you to try out a new, work-in-progress rewrite of NVDA's Windows Console support using the Microsoft UI Automation API. (#9614)
 
 
 == Changes ==
