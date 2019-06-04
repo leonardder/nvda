@@ -10,7 +10,6 @@ import copy
 import gettext
 gettext.install("nvda")
 from setuptools import setup
-import sourceEnv
 import py2exe as py2exeModule
 from glob import glob
 import fnmatch
