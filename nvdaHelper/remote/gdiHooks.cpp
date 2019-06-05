@@ -343,6 +343,9 @@ class GlyphTranslatorCache : protected LockableObject {
 
 GlyphTranslatorCache glyphTranslatorCache;
 
+wstring searchStr = L"Volendam";
+HDC followHdc = NULL;
+
 /**
  * Given a displayModel, this function clears a rectangle, and inserts a chunk, for the given text, using the given offsets and rectangle etc.
  * This function is used by many of the hook functions.
@@ -503,6 +506,16 @@ void ExtTextOutHelper(displayModel_t* model, HDC hdc, int x, int y, const RECT* 
 		TextInsertionTracker::reportTextInsertion();
 		HWND hwnd=WindowFromDC(hdc);
 		if(hwnd) queueTextChangeNotify(hwnd,textRect);
+		wchar_t fileName[MAX_PATH];
+		GetModuleFileName(NULL, fileName, MAX_PATH);
+		wstring fname(fileName);
+		if (fname.find(L"NVDA")==wstring::npos) {
+			size_t textContains = newText.find(searchStr);
+			if(textContains!=wstring::npos) {
+				followHdc = hdc;
+				LOG_ERROR(L"Text "<<newText<<" written to hdc "<<hdc<<L" of"<<fname);
+			}
+		}
 	}
 	free(characterExtents);
 }
@@ -625,6 +638,9 @@ int WINAPI fake_FillRect(HDC hdc, const RECT* lprc, HBRUSH hBrush) {
 	if(!model) return res;
 	RECT rect=*lprc;
 	dcPointsToScreenPoints(hdc,(LPPOINT)&rect,2,false);
+	if (hdc == followHdc) {
+		LOG_ERROR(L"About to clear rectangle "<<rect.left<<L", "<<rect.top<<L", "<<rect.right<<L", "<<rect.right<<L", "<<rect.bottom<<L" containing "<<searchStr);
+	}
 	model->clearRectangle(rect);
 	model->release();
 	return res;
@@ -780,6 +796,9 @@ HGDIOBJ WINAPI fake_SelectObject(HDC hdc, HGDIOBJ hGdiObj) {
 	//Try and get a displayModel for this DC
 	displayModel_t* model=acquireDisplayModel(hdc,TRUE);
 	if(!model) return res;
+	if (hdc == followHdc) {
+		LOG_ERROR(L"About to clear model containing "<<searchStr);
+	}
 	model->clearAll();
 	model->release();
 	return res;
@@ -862,6 +881,12 @@ BOOL WINAPI fake_BitBlt(HDC hdcDest, int nXDest, int nYDest, int nWidth, int nHe
 	BOOL res=real_BitBlt(hdcDest,nXDest,nYDest,nWidth,nHeight,hdcSrc,nXSrc,nYSrc,dwRop);
 	//If bit blit didn't work, or its not a simple copy, we don't want to know about it
 	if(!res) return res;
+	if (hdcDest == followHdc) {
+		LOG_ERROR(L"followHdc "<<followHdc<<L" is destination in BitBlt action");
+	}
+	if (hdcSrc == followHdc) {
+		LOG_ERROR(L"followHdc "<<followHdc<<L" is source in BitBlt action");
+	}
 	StretchBlt_helper(hdcDest, nXDest, nYDest, nWidth, nHeight, hdcSrc, nXSrc, nYSrc, nWidth, nHeight, dwRop);
 	return res;
 }
