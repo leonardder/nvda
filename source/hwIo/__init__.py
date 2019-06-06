@@ -153,9 +153,10 @@ class Serial(IoBase):
 	This extends pyserial to call a callback when data is received.
 	"""
 
+	_SerialClass = serial.Serial
 	def __init__(self, *args, **kwargs):
 		"""Constructor.
-		Pass the arguments you would normally pass to L{serial.Serial}.
+		Pass the arguments you would normally pass to L{_SerialClass}.
 		There is also one additional keyword argument.
 		@param onReceive: A callable taking a byte of received data as its only argument.
 			This callable can then call C{read} to get additional data if desired.
@@ -167,7 +168,7 @@ class Serial(IoBase):
 		if _isDebug():
 			log.debug("Opening port %s" % self.port)
 		try:
-			self._ser = serial.Serial(*args, **kwargs)
+			self._ser = self._SerialClass(*args, **kwargs)
 		except Exception as e:
 			if _isDebug():
 				log.debug("Open failed: %s" % e)
