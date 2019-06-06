@@ -11,7 +11,7 @@ try:
 except WindowsError:
 	raise RuntimeError("ftd2xx library not available")
 from . import IoBase, _isDebug
-from serial.win32 import FILE_FLAG_OVERLAPPED, FILE_ATTRIBUTE_NORMAL, ResetEvent, COMSTAT
+from serial.win32 import FILE_FLAG_OVERLAPPED, FILE_ATTRIBUTE_NORMAL, ResetEvent, COMSTAT, COMMTIMEOUTS, MAXDWORD
 import threading
 import winKernel
 
@@ -70,12 +70,9 @@ class Ftdi2(Iobase):
 			if _isDebug():
 				log.debug("Open failed: %s" % ctypes.WinError(lastError))
 			raise ctypes.WinError(lastError)
+		self._syncReadOl = OVERLAPPED()
+		self._readThread = None
 		super(Ftdi2, self).__init__(handle, onReceive, )
-		# ftd2xx has no equivalent of ReadFileEx.
-		# Therefore, run a separate threat to wait for the overlapped structure's event.
-		self._readThread = threading.Thread(target=self._readThreadFunc)
-		self._readThread.daemon = True
-		self._readThread.start()
 
 	def _readThreadFunc(self):
 		receivedBytes = ctypes.wintypes.DWORD()
@@ -86,35 +83,35 @@ class Ftdi2(Iobase):
 				return
 
 	def _asyncRead(self):
+		# ftd2xx has no equivalent of ReadFileEx.
+		# Therefore, run a separate threat to wait for the overlapped structure's event.
+		if not self._readThread:
+			self._readThread = threading.Thread(target=self._readThreadFunc)
+			self._readThread.daemon = True
+			self._readThread.start()
 		# Wait for _readSize bytes of data.
 		# _ioDone will call onReceive once it is received.
 		# onReceive can then optionally read additional bytes if it knows these are coming.
-		ftd2xx.ReadFileEx(self._file, self._readBuf, self._readSize, byref(self._readOl), self._ioDoneInst)
+		bytesRead = ctypes.wintypes.DWORD()
+		if ftd2xx.FT_W32_ReadFile(self._file, self._readBuf, self._readSize, ctypes.byref(bytesRead), ctypes.byref(self._readOl)):
+			self._	ioDone(ftd2xx.FT_W32_GetLastError(), receivedBytes, self._readOl)
 
 	def read(self, size=1):
 		# Adapted from serial.win32.Win32Serial
 		if size > 0:
-			win32.ResetEvent(self._readOl.hEvent)
+			win32.ResetEvent(self._syncReadOl.hEvent)
 			buf = ctypes.create_string_buffer()
-			rc = ctypes.DWORD()
-			err = win32.ReadFile(self.hComPort, buf, n, ctypes.byref(rc), ctypes.byref(self._overlappedRead))
-					if not err and win32.GetLastError() != win32.ERROR_IO_PENDING:
-						raise SerialException("ReadFile failed (%r)" % ctypes.WinError())
-					err = win32.WaitForSingleObject(self._overlappedRead.hEvent, win32.INFINITE)
-					read = buf.raw[:rc.value]
-				else:
-					read = bytes()
-			else:
-				buf = ctypes.create_string_buffer(size)
-				rc = win32.DWORD()
-				err = win32.ReadFile(self.hComPort, buf, size, ctypes.byref(rc), ctypes.byref(self._overlappedRead))
-				if not err and win32.GetLastError() != win32.ERROR_IO_PENDING:
-					raise SerialException("ReadFile failed (%r)" % ctypes.WinError())
-				err = win32.GetOverlappedResult(self.hComPort, ctypes.byref(self._overlappedRead), ctypes.byref(rc), True)
-				read = buf.raw[:rc.value]
+			receivedBytes = ctypes.DWORD()
+			if not ftd2xx.FT_W32_ReadFile(self._file, self._readBuf, self._readSize, ctypes.byref(receivedBytes), ctypes.byref(self._syncReadOl))
+				lastError = ftd2xx.FT_W32_GetLastError()
+				if lastError != winKernel.ERROR_IO_PENDING:
+					ctypes.WinError(lastError)
+				if not winKernel.WaitForSingleObject(self._syncReadOl.hEvent, winKernel.INFINITE):
+					raise ctypes.WinError()
+			read = buf.raw[:receivedBytes.value]
 		else:
-			read = bytes()
-		return bytes(read)
+			read = b""
+		return read
 
 	def write(self, data):
 		if _isDebug():
@@ -122,23 +119,21 @@ class Ftdi2(Iobase):
 		size = self._writeSize or len(data)
 		buf = ctypes.create_string_buffer(size)
 		buf.raw = data
-		if not ftd2xx.FT_W32_WriteFile(self._writeFile, data, size, None, byref(self._writeOl)):
+		if not ftd2xx.FT_W32_WriteFile(self._writeFile, data, size, None, ctypes.byref(self._writeOl)):
 			lastError = ftd2xx.FT_W32_GetLastError()
 			if lastError != ERROR_IO_PENDING:
 				if _isDebug():
 					log.debug("Write failed: %s" % ctypes.WinError())
 				raise ctypes.WinError(lastError)
 			bytes = DWORD()
-			ftd2xx.FT_W32_GetOverlappedResult(self._writeFile, byref(self._writeOl), byref(bytes), True)
+			ftd2xx.FT_W32_GetOverlappedResult(self._writeFile, ctypes.byref(self._writeOl), ctypes.byref(bytes), True)
 
 	def close(self):
-		if not self._ser:
-			return
-		super(Serial, self).close()
-		self._ser.close()
-
-	def _notifyReceive(self, data):
-		# Set the timeout for onReceive in case it does a sync read.
-		self._setTimeout(self._origTimeout)
-		super(Serial, self)._notifyReceive(data)
-		self._setTimeout(None)
+		if _isDebug():
+			log.debug("Closing")
+		self._onReceive = None
+		if hasattr(self, "_file") and self._file is not INVALID_HANDLE_VALUE:
+			ftd2xx.FT_W32_CancelIo(self._file)
+		if hasattr(self, "_writeFile") and self._writeFile not in (self._file, INVALID_HANDLE_VALUE):
+			ftd2xx.FT_W32_CancelIo(self._writeFile)
+		winKernel.closeHandle(self._recvEvt)
