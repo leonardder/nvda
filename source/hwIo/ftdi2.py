@@ -12,6 +12,8 @@ except WindowsError:
 	raise RuntimeError("ftd2xx library not available")
 from . import IoBase, _isDebug
 from serial.win32 import FILE_FLAG_OVERLAPPED, FILE_ATTRIBUTE_NORMAL, ResetEvent, COMSTAT
+import threading
+import winKernel
 
 FT_OK = 0
 FT_LIST_NUMBER_ONLY = 0x80000000
@@ -69,6 +71,19 @@ class Ftdi2(Iobase):
 				log.debug("Open failed: %s" % ctypes.WinError(lastError))
 			raise ctypes.WinError(lastError)
 		super(Ftdi2, self).__init__(handle, onReceive, )
+		# ftd2xx has no equivalent of ReadFileEx.
+		# Therefore, run a separate threat to wait for the overlapped structure's event.
+		self._readThread = threading.Thread(target=self._readThreadFunc)
+		self._readThread.daemon = True
+		self._readThread.start()
+
+	def _readThreadFunc(self):
+		receivedBytes = ctypes.wintypes.DWORD()
+		while true:
+			res = ftd2xx.FT_W32_GetOverlappedResult(self.handle, ctypes.byref(self._readOl), ctypes.byref(receivedBytes), True)
+			self._	ioDone(ctypes.get_last_error(), receivedBytes, self._readOl)
+			if not self._ioDone:
+				return
 
 	def _asyncRead(self):
 		# Wait for _readSize bytes of data.
