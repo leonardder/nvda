@@ -309,6 +309,9 @@ addTable("nl-BE-g0.utb", _("Dutch (Belgium)"))
 addTable("nl-NL-g0.utb", _("Dutch (Netherlands)"))
 # Translators: The name of a braille table displayed in the
 # braille settings dialog.
+addTable("nl-nl-8_integra.utb", _("Dutch 8 dot (Integra)"))
+# Translators: The name of a braille table displayed in the
+# braille settings dialog.
 addTable("no-no-8dot.utb", _("Norwegian 8 dot computer braille"))
 # Translators: The name of a braille table displayed in the
 # braille settings dialog.
