@@ -34,7 +34,7 @@ def uninitialize():
 	if res:
 		raise RuntimeError("minhook MH_Uninitialize call failed with status code %d" % res)
 
-def createHook(functype, target, detour):
+def createHook(target, detour, functype):
 	original = 	functype()
 	res = ctypes.windll.minhook.MH_CreateHook(target, detour, ctypes.byref(original))
 	if res:
@@ -57,12 +57,14 @@ def removeHook(target):
 		raise RuntimeError("minhook MH_RemoveHook call failed with status code %d" % res)
 
 @contextmanager
-def temporaryHook(target):
+def temporaryHook(target, detour, functype):
 	"""A context manager that temporary enables the specified hook,
 	disabling it after leaving the with statement.
 	"""
+	original = createHook(target, detour, functype)
 	enableHook(target)
 	try:
-		yield
+		yield original
 	finally:
 		disableHook(target)
+		removeHook(target)
