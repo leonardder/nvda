@@ -26,33 +26,46 @@ class EncodingAwareString(object):
 	>> string = EncodingAwareString('\U0001f609', encoding="utf_16_le")
 	"""
 
-	__slots__=("bytesPerIndex", "decoded", "encoded", "encoding", "errors")
 	_encodingToBytes = {
 		"utf_8": 1,
 		"utf_16_le": 2,
 		"utf_32_le": 4,
 	}
 
-	def __new__(cls, value, encoding, errors="replace"):
+	def __init__(self, value, encoding, errors="replace"):
 		encoding = encodings.normalize_encoding(encoding)
-		if encoding not in cls._encodingToBytes:
+		if encoding not in self._encodingToBytes:
 			raise ValueError("Encoding %s not supported. Supported values are %s" % (
 				encoding,
-				", ".join(cls._encodingToBytes)
+				", ".join(self._encodingToBytes)
 			))
-		obj = super(EncodingAwareString, cls).__new__(cls)
+		super(EncodingAwareString, self).__init__()
 		if isinstance(value, ByteString):
-			obj.decoded = str(value, encoding, errors)
-			obj.encoded = value
+			self.decoded = str(value, encoding, errors)
+			self.encoded = value
 		elif isinstance(value, str):
-			obj.decoded = value
-			obj.encoded = value.encode(encoding, errors)
+			self.decoded = value
+			self.encoded = value.encode(encoding, errors)
 		else:
 			raise TypeError("Value must be of type str or ByteString")
-		obj.encoding = encoding
-		obj.bytesPerIndex = cls._encodingToBytes[obj.encoding]
-		obj.errors = errors
-		return obj
+		self.encoding = encoding
+		self.bytesPerIndex = self._encodingToBytes[encoding]
+		self.errors = errors
+		self.encodingAawareToStrOffset = []
+		self.strToEncodingAwareOffset = []
+		self._initializeOffsetMaps()
+
+	def _initializeOffsetMaps(self):
+		# This is likely to break on UTF_16 surrogates on Python 2
+		lastEncodingAwareOffset = 0
+		for strOffset, char in enumerate(self.decoded):
+			assert len(self.strToEncodingAwareOffset) == strOffset
+			self.strToEncodingAwareOffset.append(lastEncodingAwareOffset)
+			encodedChar = char.encode(self.encoding)
+			for encodingAwareOffset in range(lastEncodingAwareOffset, lastEncodingAwareOffset + len(encodedChar)):
+				assert len(self.encodingAawareToStrOffset) == encodingAwareOffset
+				self.encodingAawareToStrOffset.append(strOffset)
+				lastEncodingAwareOffset = encodingAwareOffset + 1
 
 	def __repr__(self):
 		return "{}({}, encoding={})".format(self.__class__.__name__, repr(self.decoded), self.encoding)
@@ -61,14 +74,22 @@ class EncodingAwareString(object):
 	def encodingAwareLength(self):
 		return len(self.encoded) // self.bytesPerIndex
 
-	def getEncodingAwareOffsets(self, bytesStart, bytesEnd):
+	@property
+	def strLength(self):
+		return len(self.decoded)
+
+	@property
+	def bytesLength(self):
+		return len(self.encoded)
+
+	def bytesToEncodingAwareOffsets(self, bytesStart, bytesEnd):
 		if bytesStart >= len(self.encoded) or bytesEnd >= len(self.encoded):
 			raise IndexError("str indexes out of range")
 		if self.bytesPerIndex == 1:
 			return (bytesStart, bytesEnd)
 		return (bytesStart // self.bytesPerIndex, bytesEnd // self.bytesPerIndex)
 
-	def getBytesOffsets(self, encodingAwareStart, encodingAwareEnd):
+	def encodingAwareToBytesOffsets(self, encodingAwareStart, encodingAwareEnd):
 		if encodingAwareStart >= self.encodingAwareLength or encodingAwareEnd >= self.encodingAwareLength:
 			raise IndexError("EncodingAwareString indexes out of range")
 		if self.bytesPerIndex == 1:

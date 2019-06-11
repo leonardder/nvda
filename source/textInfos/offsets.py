@@ -15,6 +15,7 @@ from locationHelper import RectLTWH
 from treeInterceptorHandler import TreeInterceptor
 import api
 from six.moves import range
+import textUtils
 
 HIGH_SURROGATE_FIRST = u"\uD800"
 HIGH_SURROGATE_LAST = u"\uDBFF"
@@ -158,8 +159,12 @@ class OffsetsTextInfo(textInfos.TextInfo):
 	Note that the base implementation of L{_getPointFromOffset} uses L{_getBoundingRectFromOffset}.
 	"""
 
-	detectFormattingAfterCursorMaybeSlow=True #: honours documentFormatting config option if true - set to false if this is not at all slow.
-	useUniscribe=True #Use uniscribe to calculate word offsets etc
+	#: Honours documentFormatting config option if true - set to false if this is not at all slow.
+	detectFormattingAfterCursorMaybeSlow = True
+	#: Use uniscribe to calculate word offsets etc.
+	useUniscribe = True
+	#: The encoding internal to the underlying text info implementation
+	encoding = None
 
 	def __eq__(self,other):
 		if self is other or (isinstance(other,OffsetsTextInfo) and self._startOffset==other._startOffset and self._endOffset==other._endOffset):
@@ -283,7 +288,12 @@ class OffsetsTextInfo(textInfos.TextInfo):
 		@rtype: unicode
 		"""
 		text=self._getStoryText()
-		return text[start:end] if text else u""
+		if not self.encoding:
+			return text[start:end]
+		encodingAwareStr = textUtils.EncodingAwareString(text, self.encoding)
+		strStart = encodingAwareStr.self._encodingAwareToStrOffset[start]
+		strEnd = encodingAwareStr.self._encodingAwareToStrOffset[end]
+		return text[strStart:strEnd]
 
 	def _getFormatFieldAndOffsets(self,offset,formatConfig,calculateOffsets=True):
 		"""Retrieve the formatting information for a given offset and the offsets spanned by that field.
@@ -301,27 +311,30 @@ class OffsetsTextInfo(textInfos.TextInfo):
 		return formatField,(startOffset,endOffset)
 
 	def _getCharacterOffsets(self,offset):
-		# Windows Unicode is UTF-16, so a character may be two offsets for code points beyond 16 bits.
-		if offset > 0:
-			chars = self._getTextRange(offset - 1, offset + 2)
-			# Slicing avoids the need to check length. If invalid, it'll be the empty string.
-			prevChar = chars[0:1]
-			curChar = chars[1:2]
-			nextChar = chars[2:3]
-		else:
-			chars = self._getTextRange(offset, offset + 2)
-			prevChar = u"" # Empty string, any subsequent comparisons will evaluate to False.
-			# Slicing avoids the need to check length. If invalid, it'll be the empty string.
-			curChar = chars[0:1]
-			nextChar = chars[1:2]
-		if HIGH_SURROGATE_FIRST <= curChar <= HIGH_SURROGATE_LAST and LOW_SURROGATE_FIRST <= nextChar <= LOW_SURROGATE_LAST:
-			# curChar is a high (leading) surrogate;
-			# nextChar is a low surrogate and also part of this character.
-			return offset, offset + 2
-		elif HIGH_SURROGATE_FIRST <= prevChar <= HIGH_SURROGATE_LAST and LOW_SURROGATE_FIRST <= curChar <= LOW_SURROGATE_LAST:
-			# curChar is a low (trailing) surrogate;
-			# prevChar is a high surrogate and also part of this character.
-			return offset - 1, offset + 1
+		if self.encoding in (None, "utf_32_le"):
+			return offset, offset + 1
+		elif self.encoding == "utf_16_le":
+			# Windows Unicode is UTF-16, so a character may be two offsets for code points beyond 16 bits.
+			if offset > 0:
+				chars = self._getTextRange(offset - 1, offset + 2)
+				# Slicing avoids the need to check length. If invalid, it'll be the empty string.
+				prevChar = chars[0:1]
+				curChar = chars[1:2]
+				nextChar = chars[2:3]
+			else:
+				chars = self._getTextRange(offset, offset + 2)
+				prevChar = u"" # Empty string, any subsequent comparisons will evaluate to False.
+				# Slicing avoids the need to check length. If invalid, it'll be the empty string.
+				curChar = chars[0:1]
+				nextChar = chars[1:2]
+			if HIGH_SURROGATE_FIRST <= curChar <= HIGH_SURROGATE_LAST and LOW_SURROGATE_FIRST <= nextChar <= LOW_SURROGATE_LAST:
+				# curChar is a high (leading) surrogate;
+				# nextChar is a low surrogate and also part of this character.
+				return offset, offset + 2
+			elif HIGH_SURROGATE_FIRST <= prevChar <= HIGH_SURROGATE_LAST and LOW_SURROGATE_FIRST <= curChar <= LOW_SURROGATE_LAST:
+				# curChar is a low (trailing) surrogate;
+				# prevChar is a high surrogate and also part of this character.
+				return offset - 1, offset + 1
 		return offset, offset + 1
 
 	def _getWordOffsets(self,offset):
