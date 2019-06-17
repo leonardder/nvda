@@ -75,9 +75,6 @@ install:
 build_script:
  - ps: |
      $sconsOutTargets = "launcher"
-     if(!$env:APPVEYOR_PULL_REQUEST_NUMBER) {
-      $sconsOutTargets += " appx"
-     }
      $sconsArgs = "version=$env:version"
      if ($env:release) {
       $sconsOutTargets += " changes userGuide developerGuide client"
