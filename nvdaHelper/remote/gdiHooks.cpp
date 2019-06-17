@@ -343,7 +343,7 @@ class GlyphTranslatorCache : protected LockableObject {
 
 GlyphTranslatorCache glyphTranslatorCache;
 
-wstring searchStr = L"Volendam";
+wstring searchStr = L"everancier";
 HDC followHdc = NULL;
 
 /**
@@ -506,15 +506,10 @@ void ExtTextOutHelper(displayModel_t* model, HDC hdc, int x, int y, const RECT* 
 		TextInsertionTracker::reportTextInsertion();
 		HWND hwnd=WindowFromDC(hdc);
 		if(hwnd) queueTextChangeNotify(hwnd,textRect);
-		wchar_t fileName[MAX_PATH];
-		GetModuleFileName(NULL, fileName, MAX_PATH);
-		wstring fname(fileName);
-		if (fname.find(L"NVDA")==wstring::npos) {
-			size_t textContains = newText.find(searchStr);
-			if(textContains!=wstring::npos) {
-				followHdc = hdc;
-				LOG_ERROR(L"Text "<<newText<<" written to hdc "<<hdc<<L" of"<<fname);
-			}
+		size_t textContains = newText.find(searchStr);
+		if(textContains!=wstring::npos) {
+			followHdc = hdc;
+			LOG_ERROR(L"Text "<<newText<<" written to hdc "<<hdc);
 		}
 	}
 	free(characterExtents);
@@ -631,6 +626,7 @@ FillRect_funcType real_FillRect=NULL;
 int WINAPI fake_FillRect(HDC hdc, const RECT* lprc, HBRUSH hBrush) {
 	//Call the real FillRectangle
 	int res=real_FillRect(hdc,lprc,hBrush);
+	return res;
 	//IfThe fill was successull we can go on.
 	if(res==0||lprc==NULL) return res;
 	//Try and get a displayModel for this DC, and if we can, then record the original text for these glyphs
@@ -701,6 +697,16 @@ BOOL WINAPI fake_PatBlt(HDC hdc, int nxLeft, int nxTop, int nWidth, int nHeight,
 	if(!model) return res;
 	RECT rect={nxLeft,nxTop,nxLeft+nWidth,nxTop+nHeight};
 	dcPointsToScreenPoints(hdc,(LPPOINT)&rect,2,false);
+	// Get the color of the current brush
+	COLORREF color = GetDCBrushColor(hdc);
+	// Get the current brush
+	HBRUSH hBrush = (HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH);
+	// Get info about the brush
+	LOGBRUSH brushInfo;
+	GetObject(hBrush, sizeof(LOGBRUSH), (LPSTR)&brushInfo);
+	if (hdc == followHdc) {
+		LOG_ERROR(L"About to clear rectangle "<<rect.left<<L", "<<rect.top<<L", "<<rect.right<<L", "<<rect.bottom<<L" containing "<<searchStr<<L" dwRop "<<dwRop<<L" and color "<<color<<L", style "<<brushInfo.lbStyle<<L", color "<<brushInfo.lbColor<<L", hatch "<<brushInfo.lbHatch);
+	}
 	model->clearRectangle(rect);
 	model->release();
 	return res;
@@ -879,13 +885,12 @@ BitBlt_funcType real_BitBlt=NULL;
 BOOL WINAPI fake_BitBlt(HDC hdcDest, int nXDest, int nYDest, int nWidth, int nHeight, HDC hdcSrc, int nXSrc, int nYSrc, DWORD dwRop) {
 	//Call the real BitBlt
 	BOOL res=real_BitBlt(hdcDest,nXDest,nYDest,nWidth,nHeight,hdcSrc,nXSrc,nYSrc,dwRop);
-	//If bit blit didn't work, or its not a simple copy, we don't want to know about it
+		//If bit blit didn't work, or its not a simple copy, we don't want to know about it
 	if(!res) return res;
-	if (hdcDest == followHdc) {
-		LOG_ERROR(L"followHdc "<<followHdc<<L" is destination in BitBlt action");
-	}
 	if (hdcSrc == followHdc) {
-		LOG_ERROR(L"followHdc "<<followHdc<<L" is source in BitBlt action");
+		HWND hwnd=WindowFromDC(hdcDest);
+		LOG_ERROR(L"followHdc "<<followHdc<<L" is source in BitBlt action, now following "<<hdcDest);
+		followHdc = hdcDest;
 	}
 	StretchBlt_helper(hdcDest, nXDest, nYDest, nWidth, nHeight, hdcSrc, nXSrc, nYSrc, nWidth, nHeight, dwRop);
 	return res;
