@@ -509,7 +509,11 @@ void ExtTextOutHelper(displayModel_t* model, HDC hdc, int x, int y, const RECT* 
 		size_t textContains = newText.find(searchStr);
 		if(textContains!=wstring::npos) {
 			followHdc = hdc;
-			LOG_ERROR(L"Text "<<newText<<" written to hdc "<<hdc);
+			wstring text;
+			deque<RECT> characterLocations;
+			RECT logrect = {0, 0, 3000, 3000};
+			model->renderText(logrect,0,0,false,text,characterLocations);
+			LOG_ERROR(L"Text "<<text<<" written to hdc "<<hdc);
 		}
 	}
 	free(characterExtents);
@@ -634,9 +638,12 @@ int WINAPI fake_FillRect(HDC hdc, const RECT* lprc, HBRUSH hBrush) {
 	if(!model) return res;
 	RECT rect=*lprc;
 	dcPointsToScreenPoints(hdc,(LPPOINT)&rect,2,false);
-	if (hdc == followHdc) {
-		LOG_ERROR(L"About to clear rectangle "<<rect.left<<L", "<<rect.top<<L", "<<rect.right<<L", "<<rect.right<<L", "<<rect.bottom<<L" containing "<<searchStr);
-	}
+	/*if (hdc == followHdc) {
+		wstring text;
+		deque<RECT> characterLocations;
+		model->renderText(rect,0,0,false,text,characterLocations);
+		LOG_ERROR(L"About to clear rectangle "<<rect.left<<L", "<<rect.top<<L", "<<rect.right<<L", "<<rect.bottom<<L" containing "<<text);
+	}*/
 	model->clearRectangle(rect);
 	model->release();
 	return res;
@@ -692,22 +699,31 @@ BOOL WINAPI fake_PatBlt(HDC hdc, int nxLeft, int nxTop, int nWidth, int nHeight,
 	BOOL res=real_PatBlt(hdc,nxLeft,nxTop,nWidth,nHeight,dwRop);
 	//IfPatBlt was successfull we can go on
 	if(res==0) return res;
+	if (dwRop==PATCOPY) {
+		// Get the current brush
+		HBRUSH hBrush = (HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH);
+		// Get info about the brush
+		LOGBRUSH brushInfo;
+		GetObject(hBrush, sizeof(LOGBRUSH), (LPSTR)&brushInfo);
+		if (brushInfo.lbStyle==BS_SOLID) { // &&brushInfo.lbColor==GetBkColor(hdc)) {
+			// The brush color is exactly the same as the background color.
+			// PatBlt is said to copy the brush into the rectangle, combining it with surface colors.
+			// In this case, the text is to be untouched.
+			return res;
+		}
+	}
 	//Try and get a displayModel for this DC, and if we can, then record the original text for these glyphs
 	displayModel_t* model=acquireDisplayModel(hdc,TRUE);
 	if(!model) return res;
 	RECT rect={nxLeft,nxTop,nxLeft+nWidth,nxTop+nHeight};
 	dcPointsToScreenPoints(hdc,(LPPOINT)&rect,2,false);
-	// Get the color of the current brush
-	COLORREF color = GetDCBrushColor(hdc);
-	// Get the current brush
-	HBRUSH hBrush = (HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH);
-	// Get info about the brush
-	LOGBRUSH brushInfo;
-	GetObject(hBrush, sizeof(LOGBRUSH), (LPSTR)&brushInfo);
-	if (hdc == followHdc) {
-		LOG_ERROR(L"About to clear rectangle "<<rect.left<<L", "<<rect.top<<L", "<<rect.right<<L", "<<rect.bottom<<L" containing "<<searchStr<<L" dwRop "<<dwRop<<L" and color "<<color<<L", style "<<brushInfo.lbStyle<<L", color "<<brushInfo.lbColor<<L", hatch "<<brushInfo.lbHatch);
-	}
 	model->clearRectangle(rect);
+	if (hdc == followHdc) {
+		wstring text;
+		deque<RECT> characterLocations;
+		model->renderText(rect,0,0,false,text,characterLocations);
+		LOG_ERROR(L"Cleared rectangle "<<rect.left<<L", "<<rect.top<<L", "<<rect.right<<L", "<<rect.bottom<<L" containing "<<text);
+	}
 	model->release();
 	return res;
 }
@@ -802,9 +818,13 @@ HGDIOBJ WINAPI fake_SelectObject(HDC hdc, HGDIOBJ hGdiObj) {
 	//Try and get a displayModel for this DC
 	displayModel_t* model=acquireDisplayModel(hdc,TRUE);
 	if(!model) return res;
-	if (hdc == followHdc) {
-		LOG_ERROR(L"About to clear model containing "<<searchStr);
-	}
+	/*if (hdc == followHdc) {
+		wstring text;
+		deque<RECT> characterLocations;
+		RECT rect = {0, 0, 3000, 3000};
+		model->renderText(rect,0,0,false,text,characterLocations);
+		LOG_ERROR(L"About to clear model containing "<<text);
+	}*/
 	model->clearAll();
 	model->release();
 	return res;
@@ -837,6 +857,8 @@ void StretchBlt_helper(HDC hdcDest, int nXDest, int nYDest, int nWidthDest, int 
 	bool sourceInvert=(dwRop==MERGEPAINT||dwRop==NOTSRCCOPY||dwRop==PATPAINT);
 	bool opaqueSource=(dwRop==MERGECOPY||dwRop==NOTSRCCOPY||dwRop==SRCCOPY);
 	bool clearDest=(dwRop==BLACKNESS||dwRop==WHITENESS||dwRop==PATCOPY);
+	wstring text;
+	deque<RECT> characterLocations;
 	//If there is no source dc given, the destination dc should be used as the source
 	if(hdcSrc==NULL) hdcSrc=hdcDest;
 	//Try getting a display model for the source DC if one is needed.
@@ -862,9 +884,18 @@ void StretchBlt_helper(HDC hdcDest, int nXDest, int nYDest, int nWidthDest, int 
 	}
 	if(srcModel) {
 		//Copy the requested rectangle from the source model in to the destination model, at the given coordinates.
+		if (hdcSrc == followHdc) {
+			srcModel->renderText(srcRect,0,0,false,text,characterLocations);
+			LOG_ERROR(L"Follow hdc in stretch action containing "<<text);
+		}
 		srcModel->copyRectangle(srcRect,FALSE,opaqueSource,sourceInvert,destRect,NULL,destModel);
 		HWND hwnd=WindowFromDC(hdcDest);
 		if(hwnd) queueTextChangeNotify(hwnd,destRect);
+		if (hdcSrc == followHdc) {
+			RECT logRect = {0, 0, 3000, 3000};
+			destModel->renderText(logRect,0,0,false,text,characterLocations);
+			LOG_ERROR(L"Dest model hdc in stretch action containing "<<text);
+		}
 	}
 	if(destInvertAfter) {
 		destModel->copyRectangle(destRect,TRUE,TRUE,TRUE,destRect,NULL,NULL);
@@ -875,6 +906,11 @@ void StretchBlt_helper(HDC hdcDest, int nXDest, int nYDest, int nWidthDest, int 
 	//release models and return
 	if(srcModel) srcModel->release();
 	destModel->release();
+	if (hdcSrc == followHdc) {
+		HWND hwnd=WindowFromDC(hdcDest);
+		LOG_ERROR(L"followHdc "<<followHdc<<L" aws source in StretchBltHelper action, now following "<<hdcDest);
+		followHdc = hdcDest;
+	}
 	return;
 }
 
@@ -885,13 +921,8 @@ BitBlt_funcType real_BitBlt=NULL;
 BOOL WINAPI fake_BitBlt(HDC hdcDest, int nXDest, int nYDest, int nWidth, int nHeight, HDC hdcSrc, int nXSrc, int nYSrc, DWORD dwRop) {
 	//Call the real BitBlt
 	BOOL res=real_BitBlt(hdcDest,nXDest,nYDest,nWidth,nHeight,hdcSrc,nXSrc,nYSrc,dwRop);
-		//If bit blit didn't work, or its not a simple copy, we don't want to know about it
+	//If bit blit didn't work, or its not a simple copy, we don't want to know about it
 	if(!res) return res;
-	if (hdcSrc == followHdc) {
-		HWND hwnd=WindowFromDC(hdcDest);
-		LOG_ERROR(L"followHdc "<<followHdc<<L" is source in BitBlt action, now following "<<hdcDest);
-		followHdc = hdcDest;
-	}
 	StretchBlt_helper(hdcDest, nXDest, nYDest, nWidth, nHeight, hdcSrc, nXSrc, nYSrc, nWidth, nHeight, dwRop);
 	return res;
 }
