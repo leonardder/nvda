@@ -13,6 +13,7 @@ To use, call L{initialize} to create a singleton instance of the console GUI. Th
 import __builtin__
 import os
 import code
+import codeop
 import sys
 import pydoc
 import re
@@ -64,6 +65,26 @@ class Completer(rlcompleter.Completer):
 		# Just because something is callable doesn't always mean we want to call it.
 		return word
 
+class CommandCompiler(codeop.CommandCompiler):
+	"""
+	A L{codeop.CommandCompiler} exposing the status of the last compilation.
+	"""
+
+	def __init__(self):
+		# Old-style class
+		codeop.CommandCompiler.__init__(self)
+		#: Whether the last compilation was on error.
+		#: @type: bool
+		self.error = False
+
+	def __call__(self, *args, **kwargs):
+		self.error = False
+		try:
+			return codeop.CommandCompiler.__call__(self, *args, **kwargs)
+		except:
+			self.error = True
+			raise
+
 class PythonConsole(code.InteractiveConsole, AutoPropertyObject):
 	"""An interactive Python console for NVDA which directs output to supplied functions.
 	This is necessary for a Python console with input/output other than stdin/stdout/stderr.
@@ -102,6 +123,7 @@ class PythonConsole(code.InteractiveConsole, AutoPropertyObject):
 		# Can't use super here because stupid code.InteractiveConsole doesn't sub-class object. Grrr!
 		code.InteractiveConsole.__init__(self, locals=self.namespace, **kwargs)
 		self.prompt = ">>>"
+		self.compile = CommandCompiler()
 
 	def _set_prompt(self, prompt):
 		self._prompt = prompt
@@ -175,6 +197,7 @@ class ConsoleUI(wx.Frame):
 		inputSizer.Add(self.promptLabel, flag=wx.EXPAND)
 		self.inputCtrl = wx.TextCtrl(self, wx.ID_ANY, style=wx.TE_DONTWRAP | wx.TE_PROCESS_TAB)
 		self.inputCtrl.Bind(wx.EVT_CHAR, self.onInputChar)
+		self.inputCtrl.Bind(wx.EVT_TEXT_PASTE, self.onInputPaste)
 		inputSizer.Add(self.inputCtrl, proportion=1, flag=wx.EXPAND)
 		mainSizer.Add(inputSizer, proportion=1, flag=wx.EXPAND)
 		self.SetSizer(mainSizer)
@@ -335,6 +358,55 @@ class ConsoleUI(wx.Frame):
 			self.Close()
 			return
 		evt.Skip()
+	
+	def onInputPaste(self, evt):
+		# Test if text content is available
+		if not wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_TEXT)):
+			evt.Skip()
+			return
+		cpTextData = wx.TextDataObject()
+		if not wx.TheClipboard.Open():
+			evt.Skip()
+			return
+		try:
+			res = wx.TheClipboard.GetData(cpTextData)
+		except:
+			log.exception()
+			evt.Skip()
+			return
+		finally:
+			wx.TheClipboard.Close()
+		if not res:
+			# Retrieval of text data failed
+			evt.Skip()
+			return
+		cpText = cpTextData.GetText()
+		if not cpText.strip():
+			evt.Skip()
+			return
+		cpLines = cpText.split("\n")
+		inputLine = self.inputCtrl.GetValue()
+		pos = self.inputCtrl.GetInsertionPoint()
+		prefix = inputLine[:pos]
+		suffix = inputLine[pos:]
+		for index, line in enumerate(cpLines):
+			if index == 0:
+				# First pasted line: Prepend the input text before the cursor
+				line = prefix + line
+			if index == len(cpLines) - 1:
+				# Last pasted line: Append the input text after the cursor
+				self.inputCtrl.ChangeValue(line + suffix)
+				self.inputCtrl.SetInsertionPoint(len(line))
+				return
+			self.inputCtrl.ChangeValue(line)
+			self.execute()
+			if self.console.compile.error:
+				# A compilation error occurred: Unlike in the standard Python
+				# Console, restore the original input text after the cursor and
+				# stop here to avoid execution of the remaining lines and ease
+				# reading of output errors.
+				self.inputCtrl.ChangeValue(suffix)
+				break
 
 	def onOutputKeyDown(self, evt):
 		key = evt.GetKeyCode()
