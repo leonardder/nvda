@@ -695,16 +695,27 @@ BOOL WINAPI fake_DrawFocusRect(HDC hdc, const RECT* lprc) {
 typedef BOOL(WINAPI *PatBlt_funcType)(HDC,int,int,int,int,DWORD);
 PatBlt_funcType real_PatBlt=NULL;
 BOOL WINAPI fake_PatBlt(HDC hdc, int nxLeft, int nxTop, int nWidth, int nHeight, DWORD dwRop) {
+	// Get the current brush
+	HBRUSH hBrush = (HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH);
+	// Get info about the brush
+	LOGBRUSH brushInfo;
+	GetObject(hBrush, sizeof(LOGBRUSH), (LPSTR)&brushInfo);
+	if (brushInfo.lbStyle==BS_SOLID&&brushInfo.lbColor==15790320) {
+		// The brush color is exactly the same as the background color.
+		// PatBlt is said to copy the brush into the rectangle, combining it with surface colors.
+		// Let's do horrible things here.
+		return TRUE;
+	}
 	//Call the real PatBlt
 	BOOL res=real_PatBlt(hdc,nxLeft,nxTop,nWidth,nHeight,dwRop);
 	//IfPatBlt was successfull we can go on
 	if(res==0) return res;
 	if (dwRop==PATCOPY) {
 		// Get the current brush
-		HBRUSH hBrush = (HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH);
+		//HBRUSH hBrush = (HBRUSH)GetCurrentObject(hdc,OBJ_BRUSH);
 		// Get info about the brush
-		LOGBRUSH brushInfo;
-		GetObject(hBrush, sizeof(LOGBRUSH), (LPSTR)&brushInfo);
+		//LOGBRUSH brushInfo;
+		//GetObject(hBrush, sizeof(LOGBRUSH), (LPSTR)&brushInfo);
 		if (brushInfo.lbStyle==BS_SOLID) { // &&brushInfo.lbColor==GetBkColor(hdc)) {
 			// The brush color is exactly the same as the background color.
 			// PatBlt is said to copy the brush into the rectangle, combining it with surface colors.
