@@ -8,33 +8,44 @@
 inline void appendCharToXML(const wchar_t c, std::wstring& xml, bool isAttribute=false) {
 	switch(c) {
 		case L'"':
-		xml+=L"&quot;";
-		break;
+			xml+=L"&quot;";
+			break;
 		case L'<':
-		xml+=L"&lt;";
-		break;
+			xml+=L"&lt;";
+			break;
 		case L'>':
-		xml+=L"&gt;";
-		break;
+			xml+=L"&gt;";
+			break;
 		case L'&':
-		xml+=L"&amp;";
-		break;
+			xml+=L"&amp;";
+			break;
 		default:
-		if (c == 0x9 || c == 0xA || c == 0xD
-			|| (c >= 0x20 && c <= 0xD7FF) || (c >= 0xE000 && c <= 0xFFFD)
-		) {
-			// Valid XML character.
-			xml+=c;
-		} else {
-			// Invalid XML character.
-			if (isAttribute)
-				xml += 0xfffd; // Unicode replacement character
-			else {
-				std::wostringstream s;
-				s<<L"<unich value=\""<<((unsigned short)c)<<L"\" />";
-				xml += s.str();
+			if (
+				c == 0x9
+				|| c == 0xA
+				|| c == 0xD
+				|| (c >= 0x20 && c <= 0xD7FF)
+				|| (c >= 0xE000 && c <= 0xFFFD)
+			) {
+				// Valid XML character.
+				xml+=c;
+			} else {
+				// Invalid XML character.
+				if (isAttribute)
+					xml += 0xfffd; // Unicode replacement character
+				else {
+					std::wostringstream s;
+					s<<L"<unich ";
+					if (c >= 0xD800 && c <= 0xDBFF) {
+						s<<L"type=\"highSurrogate\" ";
+					} else if (c >= 0xDC00 && c <= 0xDFFF) {
+						s<<L"type=\"lowSurrogate\" ";
+					}
+					s<<L"value=\""<<((unsigned short)c)<<L"\" />";
+					xml += s.str();
+				}
 			}
-		}
+		// End of default
 	}
 }
 
