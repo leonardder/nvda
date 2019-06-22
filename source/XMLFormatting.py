@@ -1,6 +1,13 @@
+#XMLFormatting.py
+#A part of NonVisual Desktop Access (NVDA)
+#Copyright (C) 2008-2019 NV Access Limited, Babbage B.V.
+#This file is covered by the GNU General Public License.
+#See the file COPYING for more details.
+
 from xml.parsers import expat
 import textInfos
 from logHandler import log
+import textUtils
 
 class XMLTextParser(object): 
 
@@ -16,12 +23,17 @@ class XMLTextParser(object):
 			data=attrs.get('value',None)
 			if data is not None:
 				try:
-					data=chr(int(data))
+					dataInt = int(data)
 				except ValueError:
-					data=u'\ufffd'
-				self._CharacterDataHandler(data)
+					dataInt = 0xfffd
+				# Assumption: we are parsing data from NVDA-helper,
+				# which will be wide character data.
+				data: bytes = dataInt.to_bytes(2, "little", signed=False)
+				self._ByteDataHandler(data)
 			return
-		elif tagName=='control':
+		elif self._commandList and isinstance(self._commandList[-1], bytes):
+			self._commandList[-1] = self._commandList[-1].decode(textUtils.WCHAR_ENCODING, errors="surrogatepass")
+		if tagName=='control':
 			newAttrs=textInfos.ControlField(attrs)
 			self._commandList.append(textInfos.FieldCommand("controlStart",newAttrs))
 		elif tagName=='text':
@@ -47,6 +59,13 @@ class XMLTextParser(object):
 			pass
 		else:
 			raise ValueError("unknown tag name: %s"%tagName)
+
+	def _ByteDataHandler(self,data: bytes):
+		cmdList=self._commandList
+		if cmdList and isinstance(cmdList[-1], bytes):
+			cmdList[-1]+=data
+		else:
+			cmdList.append(data)
 
 	def _CharacterDataHandler(self,data):
 		cmdList=self._commandList
