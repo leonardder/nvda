@@ -14,7 +14,8 @@ try:
 	import brlapi
 	BRLAPI_CMD_KEYS = {
 		code: name[8:].lower()
-		for name, code in vars(brlapi).items() if name.startswith("KEY_CMD_"))
+		for name, code in vars(brlapi).items() if name.startswith("KEY_CMD_")
+	}
 except ImportError:
 	brlapi = None
 
@@ -38,7 +39,7 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver):
 		self._keyCheckTimer.Start(KEY_CHECK_INTERVAL)
 		# BRLTTY simulates key presses for braille typing keys, so let BRLTTY handle them.
 		# NVDA may eventually implement this itself, but there's no reason to deny BRLTTY users this functionality in the meantime.
-		self._con.ignoreKeys(brlapi.rangeType_type, (long(brlapi.KEY_TYPE_SYM),))
+		self._con.ignoreKeys(brlapi.rangeType_type, (brlapi.KEY_TYPE_SYM,))
 
 	def terminate(self):
 		super(BrailleDisplayDriver, self).terminate()
@@ -65,6 +66,9 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver):
 		self._handleKeyPresses()
 		self._con.writeDots(cells)
 
+	def _get_driverName(self):
+		return self._con.driverName.decode()
+
 	def _handleKeyPresses(self):
 		while True:
 			try:
@@ -83,7 +87,9 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver):
 		argument = key["argument"]
 		if keyType == brlapi.KEY_TYPE_CMD:
 			try:
-				inputCore.manager.executeGesture(InputGesture(command, argument))
+				inputCore.manager.executeGesture(
+					InputGesture(self.driverName, command, argument)
+				)
 			except inputCore.NoInputGestureAction:
 				pass
 
@@ -101,8 +107,9 @@ class InputGesture(braille.BrailleDisplayGesture):
 
 	source = BrailleDisplayDriver.name
 
-	def __init__(self, command, argument):
+	def __init__(self, model, command, argument):
 		super(InputGesture, self).__init__()
+		self.model = model
 		self.id = BRLAPI_CMD_KEYS[command]
 		if command == brlapi.KEY_CMD_ROUTE:
 			self.routingIndex = argument
