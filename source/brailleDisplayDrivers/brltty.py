@@ -2,19 +2,21 @@
 #A part of NonVisual Desktop Access (NVDA)
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
-#Copyright (C) 2008-2010 James Teh <jamie@jantrid.net>
+#Copyright (C) 2008-2019 NV Access Limited, Babbage B.V>
 
 import time
 import wx
 import braille
 from logHandler import log
 import inputCore
+from typing import List
 try:
 	import brlapi
-	BRLAPI_CMD_KEYS = dict((code, name[8:].lower())
-		for name, code in brlapi.__dict__.items() if name.startswith("KEY_CMD_"))
+	BRLAPI_CMD_KEYS = {
+		code: name[8:].lower()
+		for name, code in vars(brlapi).items() if name.startswith("KEY_CMD_"))
 except ImportError:
-	pass
+	brlapi = None
 
 KEY_CHECK_INTERVAL = 50
 
@@ -26,12 +28,7 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver):
 
 	@classmethod
 	def check(cls):
-		try:
-			brlapi
-			return True
-		except NameError:
-			pass
-		return False
+		return bool(brlapi)
 
 	def __init__(self):
 		super(BrailleDisplayDriver, self).__init__()
@@ -61,8 +58,8 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver):
 	def _get_numCells(self):
 		return self._con.displaySize[0]
 
-	def display(self, cells):
-		cells = "".join(chr(cell) for cell in cells)
+	def display(self, cells: List[int]):
+		cells = bytes(cells)
 		# HACK: Temporarily work around a bug which causes brltty to freeze if data is written while there are key presses waiting.
 		# Simply consume and act upon any waiting key presses.
 		self._handleKeyPresses()
