@@ -417,7 +417,7 @@ class BrailleDisplayDriver(braille.BrailleDisplayDriver):
 			# Packet end
 			b"\xfd"*2,
 		]
-		packetB = bytearray(packet)
+		packetB = bytearray(b"".join(packet))
 		checksum: int = 0xff & sum(packetB)
 		packetB[-2] = checksum
 
