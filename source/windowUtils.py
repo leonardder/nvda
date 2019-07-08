@@ -26,7 +26,7 @@ def findDescendantWindow(parent, visible=None, controlID=None, className=None):
 	@param controlID: The control ID of the window or C{None} if irrelevant.
 	@type controlID: int
 	@param className: The class name of the window or C{None} if irrelevant.
-	@type className: basestring
+	@type className: str
 	@return: The handle of the matching descendant window.
 	@rtype: int
 	@raise LookupError: if no matching window is found.
@@ -150,9 +150,8 @@ class CustomWindow(with_metaclass(ABCMeta, AutoPropertyObject)):
 		)
 
 	@classmethod
-	def _get_className(cls):
+	def _get_className(cls) -> str:
 		"""The class name of this window.
-		@rtype: unicode
 		"""
 		return None
 
@@ -178,15 +177,15 @@ class CustomWindow(with_metaclass(ABCMeta, AutoPropertyObject)):
 		@type parent: int
 		@raise WindowsError: If an error occurs.
 		"""
-		if not isinstance(self.className, unicode):
-			raise TypeError("className attribute must be a unicode string")
-		if windowName and not isinstance(windowName, unicode):
-			raise TypeError("windowName must be a unicode string")
-		if not isinstance(windowStyle, (int, long)):
+		if not isinstance(self.className, str):
+			raise ValueError("className attribute must be a string")
+		if windowName and not isinstance(windowName, str):
+			raise ValueError("windowName must be a string")
+		if not isinstance(windowStyle, int):
 			raise TypeError("windowStyle must be an integer")
-		if not isinstance(extendedWindowStyle, (int, long)):
+		if not isinstance(extendedWindowStyle, int):
 			raise TypeError("extendedWindowStyle must be an integer")
-		if parent and not isinstance(parent, (int, long)):
+		if parent and not isinstance(parent, int):
 			raise TypeError("parent must be an integer")
 		res = self._classAtom = ctypes.windll.user32.RegisterClassExW(ctypes.byref(self._wClass))
 		if res == 0:

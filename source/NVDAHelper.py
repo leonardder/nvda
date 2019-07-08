@@ -6,10 +6,7 @@
 
 import os
 import sys
-try:
-	import _winreg as winreg # Python 2.7 import
-except ImportError:
-	import winreg # Python 3 import
+import winreg
 import msvcrt
 import versionInfo
 import winKernel
@@ -304,7 +301,7 @@ def handleInputConversionModeUpdate(oldFlags,newFlags,lcid):
 		if msg:
 			textList.append(msg)
 	else:
-		for x in xrange(32):
+		for x in range(32):
 			x=2**x
 			msgs=inputConversionModeMessages.get(x)
 			if not msgs: continue
@@ -430,7 +427,8 @@ class RemoteLoader64(object):
 		pipeRead = self._duplicateAsInheritable(pipeReadOrig)
 		winKernel.closeHandle(pipeReadOrig)
 		# stdout/stderr of the loader process should go to nul.
-		with file("nul", "w") as nul:
+		# #9038 (Py3 review required): File() function is gone, replaced by open().
+		with open("nul", "w") as nul:
 			nulHandle = self._duplicateAsInheritable(msvcrt.get_osfhandle(nul.fileno()))
 		# Set the process to start with the appropriate std* handles.
 		si = winKernel.STARTUPINFO(dwFlags=winKernel.STARTF_USESTDHANDLES, hSTDInput=pipeRead, hSTDOutput=nulHandle, hSTDError=nulHandle)
