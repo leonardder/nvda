@@ -6,7 +6,7 @@
 #See the file COPYING for more details.
 
 import logging
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty, ABCMeta
 import os
 import copy
 import re
@@ -1022,7 +1022,7 @@ class StringDriverSettingChanger(DriverSettingChanger):
 				getattr(self.container,"_%ss"%self.setting.id)[evt.GetSelection()].id
 			)
 
-class DriverSettingsMixin(object):
+class DriverSettingsMixin(metaclass=ABCMeta):
 	"""
 	Mixin class that provides support for driver specific gui settings.
 	Derived classes should implement L{driver}.
@@ -1034,7 +1034,7 @@ class DriverSettingsMixin(object):
 		super(DriverSettingsMixin,self).__init__(*args,**kwargs)
 		self._curDriverRef = weakref.ref(self.driver)
 
-	@property
+	@abstractproperty
 	def driver(self):
 		raise NotImplementedError
 
