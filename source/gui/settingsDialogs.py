@@ -2817,7 +2817,9 @@ class VisionSettingsPanel(SettingsPanel):
 		providerLabelText = _("&Vision enhancement providers")
 
 		providersBox = wx.StaticBox(self, label=providerLabelText)
+		providersGroupDescription = _("Providers are activated and deactivated as soon as you check or uncheck check boxes.")
 		providersGroup = guiHelper.BoxSizerHelper(self, sizer=wx.StaticBoxSizer(providersBox, wx.HORIZONTAL))
+		providersGroup.addItem(wx.StaticText(self, label=providersGroupDescription))
 		self.providerList = providersGroup.addLabeledControl(
 			"{}:".format(providerLabelText),
 			nvdaControls.CustomCheckListBox,
