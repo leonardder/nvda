@@ -2859,8 +2859,8 @@ class VisionSettingsPanel(SettingsPanel):
 			# Translators: This message is presented when
 			# NVDA is unable to load selected
 			# vision enhancement provider.
-			gui.messageBox(_("Could not load the %s vision enhancement provider.")%name, _("Vision Enhancement Provider Error"), wx.OK|wx.ICON_WARNING, self)
-			#self.providerList.Check(index, False)
+			gui.messageBox(_("Could not load the %s vision enhancement provider.")%providerName, _("Vision Enhancement Provider Error"), wx.OK|wx.ICON_WARNING, self)
+			self.providerList.Check(index, False)
 			return 
 		evt.Skip()
 		self.refreshPanel()
