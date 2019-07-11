@@ -2809,7 +2809,7 @@ class VisionSettingsPanel(SettingsPanel):
 	title = _("Vision")
 
 	def makeSettings(self, settingsSizer):
-		self.cachedProviders = list(vision.handler.providers)
+		self.configuredProviders = config.conf['vision']['providers'][:]
 		self.providerPanelInstances = []
 		settingsSizerHelper = guiHelper.BoxSizerHelper(self, sizer=settingsSizer)
 
@@ -2894,12 +2894,12 @@ class VisionSettingsPanel(SettingsPanel):
 		for panel in self.providerPanelInstances:
 			panel.onDiscard()
 
-		providersToInitialize = [name for name in self.cachedProviders if name not in vision.handler.providers]
+		providersToInitialize = [name for name in self.configuredProviders if name not in vision.handler.providers]
 		for provider in providersToInitialize:
 			if not vision.handler.initializeProvider(provider):
 				initErrors.append(provider)
 
-		providersToTerminate = [name for name in vision.handler.providers if name not in self.cachedProviders]
+		providersToTerminate = [name for name in vision.handler.providers if name not in self.configuredProviders]
 		for provider in providersToTerminate:
 			vision.handler.terminateProvider(provider)
 
@@ -2912,7 +2912,7 @@ class VisionSettingsPanel(SettingsPanel):
 	def onSave(self):
 		for panel in self.providerPanelInstances:
 			panel.onSave()
-		self.cachedProviders = list(vision.handler.providers)
+		self.configuredProviders = config.conf['vision']['providers'][:]
 
 class VisionProviderSubPanel(DriverSettingsMixin, SettingsPanel):
 
