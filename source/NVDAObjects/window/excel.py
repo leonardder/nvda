@@ -324,7 +324,7 @@ class ExcelQuicknavIterator(object):
 	def __init__(self, itemType , document , direction , includeCurrent):
 		"""
 		See L{QuickNavItemIterator} for itemType, document and direction definitions.
-		@ param includeCurrent: if true then any item at the initial position will be also emitted rather than just further ones. 
+		@param includeCurrent: if true then any item at the initial position will be also emitted rather than just further ones. 
 		"""
 		self.document=document
 		self.itemType=itemType
@@ -1095,7 +1095,7 @@ class ExcelCellInfoQuicknavIterator(object, metaclass=abc.ABCMeta):
 	def __init__(self, itemType , document , direction , includeCurrent):
 		"""
 		See L{QuickNavItemIterator} for itemType, document and direction definitions.
-		@ param includeCurrent: if true then any item at the initial position will be also emitted rather than just further ones. 
+		@param includeCurrent: if true then any item at the initial position will be also emitted rather than just further ones. 
 		"""
 		self.document=document
 		self.itemType=itemType
