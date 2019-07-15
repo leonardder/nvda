@@ -19,6 +19,7 @@ import gui
 import speech
 import braille
 
+
 # From urlmon.h
 URL_MK_UNIFORM = 1
 
@@ -64,21 +65,25 @@ def browseableMessage(message,title=None,isHtml=False):
 	)
 	gui.mainFrame.postPopup() 
 
-def message(text):
+def message(text, speechPriority=None):
 	"""Present a message to the user.
 	The message will be presented in both speech and braille.
 	@param text: The text of the message.
 	@type text: str
+	@param speechPriority: The speech priority.
+	@type speechPriority: One of the C{speech.priorities.SPRI_*} constants.
 	"""
-	speech.speakMessage(text)
+	speech.speakMessage(text, priority=speechPriority)
 	braille.handler.message(text)
 
-def reviewMessage(text):
+def reviewMessage(text, speechPriority=None):
 	"""Present a message from review or object navigation to the user.
 	The message will always be presented in speech, and also in braille if it is tethered to review or when auto tethering is on.
 	@param text: The text of the message.
 	@type text: str
+	@param speechPriority: The speech priority.
+	@type speechPriority: One of the C{speech.priorities.SPRI_*} constants.
 	"""
-	speech.speakMessage(text)
+	speech.speakMessage(text, priority=speechPriority)
 	if braille.handler.shouldAutoTether or braille.handler.getTether() == braille.handler.TETHER_REVIEW:
 		braille.handler.message(text)
