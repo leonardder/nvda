@@ -377,7 +377,7 @@ def isObjectInActiveTreeInterceptor(obj: NVDAObjects.NVDAObject) -> bool:
 	return bool(
 		isinstance(obj, NVDAObjects.NVDAObject)
 		and obj.treeInterceptor
-		and obj.treeInterceptor.passThrough
+		and not obj.treeInterceptor.passThrough
 	)
 
 def getCaretObject():
