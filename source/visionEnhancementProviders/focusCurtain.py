@@ -10,13 +10,13 @@ class CurtainWindow(HighlightWindow):
 	className = u"NVDAFocusCurtain"
 	windowName = u"NVDA Focus Curtain Window"
 	transparentColor = 0x0
-	whiteBrush = winGDI.gdi32.CreateSolidBrush(COLORREF(0xffffff))
+	bgBrush = winGDI.gdi32.CreateSolidBrush(COLORREF(0x6a6a6a))
 
 	@classmethod
 	def _get__wClass(cls):
 		wClass = super(HighlightWindow, cls)._wClass
 		wClass.style = winUser.CS_HREDRAW | winUser.CS_VREDRAW
-		wClass.hbrBackground = cls.whiteBrush
+		wClass.hbrBackground = cls.bgBrush
 		return wClass
 
 	def _paint(self):
