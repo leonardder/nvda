@@ -7,23 +7,14 @@
 from comtypes import COMError
 import config
 from logHandler import log
+from _UIAHandler import *
 
 handler=None
-isUIAAvailable=False
-
-if config.conf and config.conf["UIA"]["enabled"]:
-	# Because Windows 7 SP1 (NT 6.1) or later is supported, just assume UIA can be used unless told otherwise.
-	try:
-		from _UIAHandler import *
-		isUIAAvailable=True
-	except ImportError:
-		log.debugWarning("Unable to import _UIAHandler",exc_info=True)
-		pass
 
 def initialize():
 	global handler
-	if not isUIAAvailable:
-		raise NotImplementedError
+	if not config.conf["UIA"]["enabled"]:
+		raise RuntimeError("UIA forcefully disabled in configuration")
 	try:
 		handler=UIAHandler()
 	except COMError:
