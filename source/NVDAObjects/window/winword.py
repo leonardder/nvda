@@ -6,6 +6,7 @@
 
 import ctypes
 import time
+import watchdog
 from comtypes import COMError, GUID, BSTR
 import comtypes.client
 import comtypes.automation
@@ -649,7 +650,14 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 	def _expandToLineAtCaret(self):
 		lineStart=ctypes.c_int()
 		lineEnd=ctypes.c_int()
-		res=NVDAHelper.localLib.nvdaInProcUtils_winword_expandToLine(self.obj.appModule.helperLocalBindingHandle,self.obj.documentWindowHandle,self._rangeObj.start,ctypes.byref(lineStart),ctypes.byref(lineEnd))
+		res = watchdog.cancellableExecute(
+			NVDAHelper.localLib.nvdaInProcUtils_winword_expandToLine,
+			self.obj.appModule.helperLocalBindingHandle,
+			self.obj.documentWindowHandle,
+			self._rangeObj.start,
+			ctypes.byref(lineStart),
+			ctypes.byref(lineEnd)
+		)
 		if res!=0 or lineStart.value==lineEnd.value or lineStart.value==-1 or lineEnd.value==-1: 
 			log.debugWarning("winword_expandToLine failed")
 			self._rangeObj.expand(wdParagraph)
@@ -708,7 +716,15 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			formatConfigFlags&=~formatConfigFlagsMap['reportRevisions']
 		if self.obj.ignorePageNumbers:
 			formatConfigFlags&=~formatConfigFlagsMap['reportPage']
-		res=NVDAHelper.localLib.nvdaInProcUtils_winword_getTextInRange(self.obj.appModule.helperLocalBindingHandle,self.obj.documentWindowHandle,startOffset,endOffset,formatConfigFlags,ctypes.byref(text))
+		res = watchdog.cancellableExecute(
+			NVDAHelper.localLib.nvdaInProcUtils_winword_getTextInRange,
+			self.obj.appModule.helperLocalBindingHandle,
+			self.obj.documentWindowHandle,
+			startOffset,
+			endOffset,
+			formatConfigFlags,
+			ctypes.byref(text)
+		)
 		if res or not text:
 			log.debugWarning("winword_getTextInRange failed with %d"%res)
 			return [self.text]
@@ -976,7 +992,14 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 		oldOffset=self._rangeObj.end if endPoint=="end" else self._rangeObj.start
 		newOffset=ctypes.c_long()
 		# Try moving by line making use of the selection temporarily
-		res=NVDAHelper.localLib.nvdaInProcUtils_winword_moveByLine(self.obj.appModule.helperLocalBindingHandle,self.obj.documentWindowHandle,oldOffset,1 if direction<0 else 0,ctypes.byref(newOffset))
+		res = watchdog.cancellableExecute(
+			NVDAHelper.localLib.nvdaInProcUtils_winword_moveByLine,
+			self.obj.appModule.helperLocalBindingHandle,
+			self.obj.documentWindowHandle,
+			oldOffset,
+			1 if direction<0 else 0,
+			ctypes.byref(newOffset)
+		)
 		if res==0:
 			res=direction
 		newOffset=newOffset.value
@@ -1469,7 +1492,12 @@ class WordDocument(Window):
 class WordDocument_WwN(WordDocument):
 
 	def _get_documentWindowHandle(self):
-		w=NVDAHelper.localLib.findWindowWithClassInThread(self.windowThreadID,u"_WwG",True)
+		w = watchdog.cancellableExecute(
+			NVDAHelper.localLib.findWindowWithClassInThread,
+			self.windowThreadID,
+			u"_WwG",
+			True
+		)
 		if not w:
 			log.debugWarning("Could not find window for class _WwG in thread.")
 			w=super(WordDocument_WwN,self).documentWindowHandle
