@@ -15,16 +15,20 @@ from ctypes import create_string_buffer, byref
 
 SAMPLE_RATE = 44100
 
-try:
-	player = nvwave.WavePlayer(channels=2, samplesPerSec=int(SAMPLE_RATE), bitsPerSample=16, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
-except:
-	log.warning("Failed to initialize audio for tones")
-	player = None
+player = None
+
+def initialize():
+	global player
+	try:
+		player = nvwave.WavePlayer(channels=2, samplesPerSec=int(SAMPLE_RATE), bitsPerSample=16, outputDevice=config.conf["speech"]["outputDevice"],wantDucking=False)
+	except:
+		log.warning("Failed to initialize audio for tones")
+		player = None
 
 # When exiting, ensure player is deleted before modules get cleaned up.
 # Otherwise, WavePlayer.__del__ will fail with an exception.
 @atexit.register
-def _cleanup():
+def terminate():
 	global player
 	player = None
 
