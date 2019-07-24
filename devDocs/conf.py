@@ -84,11 +84,18 @@ html_static_path = ['_static']
 autoclass_content = "both" # Both the class’ and the __init__ method’s docstring are concatenated and inserted.
 autodoc_member_order = 'bysource'
 autodoc_mock_imports = [
-	"config",
-	"louis",
+	"louis", # Not our project
 ]
 
-# SUpport for auto generation of API docs
+# Perform some manual mocking of specific objects.
+# autodoc can only mock modules, not objects.
+from sphinx.ext.autodoc.mock import _make_subclass
+
+import config
+# Mock an instance of the configuration manager.
+config.conf = _make_subclass("conf","config")()
+
+# Support for auto generation of API docs
 # Based on code published in https://github.com/readthedocs/readthedocs.org/issues/1139#issuecomment-398083449
 
 def run_apidoc(_):
@@ -109,7 +116,7 @@ def run_apidoc(_):
 		'sourceEnv.py', # Only available when running from source
 	]
 	argv = [
-		"--force", # overwrite existing files
+		#"--force", # overwrite existing files
 		"-P", # Include private modules
 		"--module-first", # put module documentation before submodule documentation
 		"--output-dir", ".",
