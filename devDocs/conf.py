@@ -52,7 +52,7 @@ default_role = 'py:obj'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-	'sphinx.ext.autodoc',
+	'autoapi.extension',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -79,52 +79,4 @@ html_static_path = ['_static']
 
 # -- Extension configuration -------------------------------------------------
 
-# sphinx.ext.autodoc configuration
-
-autoclass_content = "both" # Both the class’ and the __init__ method’s docstring are concatenated and inserted.
-autodoc_member_order = 'bysource'
-autodoc_mock_imports = [
-	"louis", # Not our project
-]
-
-# Perform some manual mocking of specific objects.
-# autodoc can only mock modules, not objects.
-from sphinx.ext.autodoc.mock import _make_subclass
-
-import config
-# Mock an instance of the configuration manager.
-config.conf = _make_subclass("conf","config")()
-
-# Support for auto generation of API docs
-# Based on code published in https://github.com/readthedocs/readthedocs.org/issues/1139#issuecomment-398083449
-
-def run_apidoc(_):
-	ignore_paths = [
-		'_buildVersion.py',
-		'comInterfaces',
-		'images',
-		'lib',
-		'lib64',
-		'libArm64',
-		'locale',
-		'louis', # Not our project
-		'typelibs',
-		'waves',
-		"mathType.py", # Fails when not installed
-		'oleTypes.py', # Not our code
-		'setup.py', # Py2exe
-		'sourceEnv.py', # Only available when running from source
-	]
-	argv = [
-		#"--force", # overwrite existing files
-		"-P", # Include private modules
-		"--module-first", # put module documentation before submodule documentation
-		"--output-dir", ".",
-		sys.path[0] # Module sources
-	] + [os.path.join(sys.path[0], path) for path in ignore_paths]
-
-	from sphinx.ext import apidoc
-	apidoc.main(argv)
-
-def setup(app):
-	app.connect('builder-inited', run_apidoc)
+autoapi_dirs = ['../source']
