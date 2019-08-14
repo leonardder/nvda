@@ -30,6 +30,7 @@ import speechDictHandler
 import characterProcessing
 import languageHandler
 from .commands import *
+from typing import Optional, Dict, Any
 
 speechMode_off=0
 speechMode_beeps=1
@@ -850,9 +851,16 @@ def speakTextInfo(info, useCache=True, formatConfig=None, unit=None, reason=cont
 	if reason!=controlTypes.REASON_FOCUS:
 		endingBlock=False
 		for count in reversed(range(commonFieldCount,len(controlFieldStackCache))):
-			text=info.getControlFieldSpeech(controlFieldStackCache[count],controlFieldStackCache[0:count],"end_removedFromControlFieldStack",formatConfig,extraDetail,reason=reason)
-			if text:
-				speechSequence.append(text)
+			fieldSequence = info.getControlFieldSpeech(
+				controlFieldStackCache[count],
+				controlFieldStackCache[0:count],
+				"end_removedFromControlFieldStack",
+				formatConfig,
+				extraDetail,
+				reason=reason
+			)
+			if fieldSequence:
+				speechSequence.extend(fieldSequence)
 			if not endingBlock and reason==controlTypes.REASON_SAYALL:
 				endingBlock=bool(int(controlFieldStackCache[count].get('isBlock',0)))
 		if endingBlock:
@@ -867,9 +875,16 @@ def speakTextInfo(info, useCache=True, formatConfig=None, unit=None, reason=cont
 	if not extraDetail:
 		for count in range(commonFieldCount):
 			field=newControlFieldStack[count]
-			text=info.getControlFieldSpeech(field,newControlFieldStack[0:count],"start_inControlFieldStack",formatConfig,extraDetail,reason=reason)
-			if text:
-				speechSequence.append(text)
+			fieldSequence = info.getControlFieldSpeech(
+				field,
+				newControlFieldStack[0:count],
+				"start_inControlFieldStack",
+				formatConfig,
+				extraDetail,
+				reason=reason
+			)
+			if fieldSequence:
+				speechSequence.extend(fieldSequence)
 				isTextBlank=False
 			if field.get("role")==controlTypes.ROLE_MATH:
 				isTextBlank=False
@@ -889,9 +904,16 @@ def speakTextInfo(info, useCache=True, formatConfig=None, unit=None, reason=cont
 					speechSequence.append(controlTypes.stateLabels[controlTypes.STATE_CLICKABLE])
 					isTextBlank=False
 				inClickable=True
-		text=info.getControlFieldSpeech(field,newControlFieldStack[0:count],"start_addedToControlFieldStack",formatConfig,extraDetail,reason=reason)
-		if text:
-			speechSequence.append(text)
+		fieldSequence = info.getControlFieldSpeech(
+			field,
+			newControlFieldStack[0:count],
+			"start_addedToControlFieldStack",
+			formatConfig,
+			extraDetail,
+			reason=reason
+		)
+		if fieldSequence:
+			speechSequence.extend(fieldSequence)
 			isTextBlank=False
 		if field.get("role")==controlTypes.ROLE_MATH:
 			isTextBlank=False
@@ -899,9 +921,17 @@ def speakTextInfo(info, useCache=True, formatConfig=None, unit=None, reason=cont
 		commonFieldCount+=1
 
 	#Fetch the text for format field attributes that have changed between what was previously cached, and this textInfo's initialFormatField.
-	text=info.getFormatFieldSpeech(newFormatField,formatFieldAttributesCache,formatConfig,reason=reason,unit=unit,extraDetail=extraDetail,initialFormat=True)
-	if text:
-		speechSequence.append(text)
+	fieldSequence = info.getFormatFieldSpeech(
+		newFormatField,
+		formatFieldAttributesCache,
+		formatConfig,
+		reason=reason,
+		unit=unit,
+		extraDetail=extraDetail,
+		initialFormat=True
+	)
+	if fieldSequence:
+		speechSequence.extend(fieldSequence)
 	if autoLanguageSwitching:
 		language=newFormatField.get('language')
 		speechSequence.append(LangChangeCommand(language))
@@ -952,7 +982,7 @@ def speakTextInfo(info, useCache=True, formatConfig=None, unit=None, reason=cont
 			if  command.command=="controlStart":
 				# Control fields always start a new chunk, even if they have no field text.
 				inTextChunk=False
-				tempTextList=[]
+				fieldSequence = []
 				if not inClickable and formatConfig['reportClickable']:
 					states=command.field.get('states')
 					if states and controlTypes.STATE_CLICKABLE in states:
@@ -960,25 +990,43 @@ def speakTextInfo(info, useCache=True, formatConfig=None, unit=None, reason=cont
 						# Announce it if there is nothing else interesting about the field, but not if the user turned it off. 
 						presCat=command.field.getPresentationCategory(newControlFieldStack[0:],formatConfig,reason)
 						if not presCat or presCat is command.field.PRESCAT_LAYOUT:
-							tempTextList.append(controlTypes.stateLabels[controlTypes.STATE_CLICKABLE])
+							fieldSequence.append(controlTypes.stateLabels[controlTypes.STATE_CLICKABLE])
 						inClickable=True
-				text=info.getControlFieldSpeech(command.field,newControlFieldStack,"start_relative",formatConfig,extraDetail,reason=reason)
-				if text:
-					tempTextList.append(text)
-				fieldText=" ".join(tempTextList)
+				fieldSequence.extend(info.getControlFieldSpeech(
+					command.field,
+					newControlFieldStack,
+					"start_relative",
+					formatConfig,
+					extraDetail,
+					reason=reason
+				))
 				newControlFieldStack.append(command.field)
 			elif command.command=="controlEnd":
 				# Exiting a controlField should break a run of clickables
 				inClickable=False
 				# Control fields always start a new chunk, even if they have no field text.
 				inTextChunk=False
-				fieldText=info.getControlFieldSpeech(newControlFieldStack[-1],newControlFieldStack[0:-1],"end_relative",formatConfig,extraDetail,reason=reason)
+				fieldSequence = info.getControlFieldSpeech(
+					newControlFieldStack[-1],
+					newControlFieldStack[0:-1],
+					"end_relative",
+					formatConfig,
+					extraDetail,
+					reason=reason
+				)
 				del newControlFieldStack[-1]
 				if commonFieldCount>len(newControlFieldStack):
 					commonFieldCount=len(newControlFieldStack)
 			elif command.command=="formatChange":
-				fieldText=info.getFormatFieldSpeech(command.field,formatFieldAttributesCache,formatConfig,reason=reason,unit=unit,extraDetail=extraDetail)
-				if fieldText:
+				fieldSequence = info.getFormatFieldSpeech(
+					command.field,
+					formatFieldAttributesCache,
+					formatConfig,
+					reason=reason,
+					unit=unit,
+					extraDetail=extraDetail
+				)
+				if fieldSequence:
 					inTextChunk=False
 				if autoLanguageSwitching:
 					newLanguage=command.field.get('language')
@@ -986,12 +1034,12 @@ def speakTextInfo(info, useCache=True, formatConfig=None, unit=None, reason=cont
 						# The language has changed, so this starts a new text chunk.
 						inTextChunk=False
 			if not inTextChunk:
-				if fieldText:
+				if fieldSequence:
 					if autoLanguageSwitching and lastLanguage is not None:
 						# Fields must be spoken in the default language.
 						relativeSpeechSequence.append(LangChangeCommand(None))
 						lastLanguage=None
-					relativeSpeechSequence.append(fieldText)
+					relativeSpeechSequence.extend(fieldSequence)
 				if command.command=="controlStart" and command.field.get("role")==controlTypes.ROLE_MATH:
 					_speakTextInfo_addMath(relativeSpeechSequence,info,command.field)
 				if autoLanguageSwitching and newLanguage!=lastLanguage:
@@ -1023,9 +1071,16 @@ def speakTextInfo(info, useCache=True, formatConfig=None, unit=None, reason=cont
 		lastLanguage=None
 	if not extraDetail:
 		for count in reversed(range(min(len(newControlFieldStack),commonFieldCount))):
-			text=info.getControlFieldSpeech(newControlFieldStack[count],newControlFieldStack[0:count],"end_inControlFieldStack",formatConfig,extraDetail,reason=reason)
-			if text:
-				speechSequence.append(text)
+			fieldSequence = info.getControlFieldSpeech(
+				newControlFieldStack[count],
+				newControlFieldStack[0:count],
+				"end_inControlFieldStack",
+				formatConfig,
+				extraDetail,
+				reason=reason
+			)
+			if fieldSequence:
+				speechSequence.extend(fieldSequence)
 				isTextBlank=False
 
 	# If there is nothing  that should cause the TextInfo to be considered non-blank, blank should be reported, unless we are doing a say all.
@@ -1173,7 +1228,7 @@ def getSpeechTextForProperties(reason=controlTypes.REASON_QUERY,**propertyValues
 
 def getControlFieldSpeech(attrs,ancestorAttrs,fieldType,formatConfig=None,extraDetail=False,reason=None):
 	if attrs.get('isHidden'):
-		return u""
+		return []
 	if not formatConfig:
 		formatConfig=config.conf["documentFormatting"]
 
@@ -1254,7 +1309,7 @@ def getControlFieldSpeech(attrs,ancestorAttrs,fieldType,formatConfig=None,extraD
 		# Table.
 		rowCount=(attrs.get("table-rowcount-presentational") or attrs.get("table-rowcount"))
 		columnCount=(attrs.get("table-columncount-presentational") or attrs.get("table-columncount"))
-		return " ".join((
+		return [" ".join((
 			nameText,
 			roleText,
 			stateText, 
@@ -1264,10 +1319,10 @@ def getControlFieldSpeech(attrs,ancestorAttrs,fieldType,formatConfig=None,extraD
 				columnCount=columnCount
 			),
 			levelText
-		))
+		))]
 	elif nameText and reason==controlTypes.REASON_FOCUS and fieldType == "start_addedToControlFieldStack" and role in (controlTypes.ROLE_GROUPING, controlTypes.ROLE_PROPERTYPAGE):
 		# #3321, #709: Report the name of groupings (such as fieldsets) and tab pages for quicknav and focus jumps
-		return " ".join((nameText,roleText))
+		return [" ".join((nameText,roleText))]
 	elif fieldType in ("start_addedToControlFieldStack","start_relative") and role in (controlTypes.ROLE_TABLECELL,controlTypes.ROLE_TABLECOLUMNHEADER,controlTypes.ROLE_TABLEROWHEADER) and tableID:
 		# Table cell.
 		reportTableHeaders = formatConfig["reportTableHeaders"]
@@ -1282,9 +1337,11 @@ def getControlFieldSpeech(attrs,ancestorAttrs,fieldType,formatConfig=None,extraD
 		if reportTableHeaders:
 			getProps['rowHeaderText'] = attrs.get("table-rowheadertext")
 			getProps['columnHeaderText'] = attrs.get("table-columnheadertext")
-		return (getSpeechTextForProperties(_tableID=tableID, **getProps)
+		return [
+			getSpeechTextForProperties(_tableID=tableID, **getProps)
 			+ (" %s" % stateText if stateText else "")
-			+ (" %s" % ariaCurrentText if ariaCurrent else ""))
+			+ (" %s" % ariaCurrentText if ariaCurrent else "")
+		]
 
 	# General cases.
 	if (
@@ -1302,22 +1359,30 @@ def getControlFieldSpeech(attrs,ancestorAttrs,fieldType,formatConfig=None,extraD
 		out.extend(x for x in (nameText,(stateText if speakStatesFirst else roleText),(roleText if speakStatesFirst else stateText),containerContainsText,ariaCurrentText,valueText,descriptionText,levelText,keyboardShortcutText) if x)
 		if content and not speakContentFirst:
 			out.append(content)
-		return CHUNK_SEPARATOR.join(out)
+		return [CHUNK_SEPARATOR.join(out)]
 		
 	elif fieldType in ("end_removedFromControlFieldStack","end_relative") and roleText and ((not extraDetail and speakExitForLine) or (extraDetail and speakExitForOther)):
 		# Translators: Indicates end of something (example output: at the end of a list, speaks out of list).
-		return _("out of %s")%roleText
+		return [_("out of %s")%roleText]
 
 	# Special cases
 	elif not speakEntry and fieldType in ("start_addedToControlFieldStack","start_relative"):
 		out = []
 		if ariaCurrent:
 			out.append(ariaCurrentText)
-		return CHUNK_SEPARATOR.join(out)
+		return [CHUNK_SEPARATOR.join(out)]
 	else:
-		return ""
+		return []
 
-def getFormatFieldSpeech(attrs,attrsCache=None,formatConfig=None,reason=None,unit=None,extraDetail=False , initialFormat=False, separator=CHUNK_SEPARATOR):
+def getFormatFieldSpeech(
+		attrs: Dict[str, Any],
+		attrsCache: Optional[Dict[str, Any]] = None,
+		formatConfig: Optional[Dict[str, bool]] = None,
+		reason: Optional[str] = None,
+		unit: Optional[str] = None,
+		extraDetail: bool = False,
+		initialFormat: bool = False,
+):
 	if not formatConfig:
 		formatConfig=config.conf["documentFormatting"]
 	textList=[]
@@ -1734,7 +1799,7 @@ def getFormatFieldSpeech(attrs,attrsCache=None,formatConfig=None,reason=None,uni
 	if attrsCache is not None:
 		attrsCache.clear()
 		attrsCache.update(attrs)
-	return separator.join(textList)
+	return textList
 
 def getTableInfoSpeech(tableInfo,oldTableInfo,extraDetail=False):
 	if tableInfo is None and oldTableInfo is None:

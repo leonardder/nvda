@@ -1120,7 +1120,7 @@ class BrowseModeDocumentTextInfo(textInfos.TextInfo):
 			if landmark != "region":
 				textList.append(_("%s landmark") % aria.landmarkRoles[landmark])
 		textList.append(super(BrowseModeDocumentTextInfo, self).getControlFieldSpeech(attrs, ancestorAttrs, fieldType, formatConfig, extraDetail, reason))
-		return " ".join(textList)
+		return [" ".join(textList)]
 
 	def getControlFieldBraille(self, field, ancestors, reportStart, formatConfig):
 		textList = []
