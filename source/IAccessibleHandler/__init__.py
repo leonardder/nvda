@@ -41,6 +41,8 @@ from comInterfaces.IAccessible2Lib import (
 	IAccessibleText,
 	IAccessibleHypertext,
 	IAccessible2,
+	IAccessible2_2,
+	IAccessible2_3,
 	IA2_STATE_REQUIRED,
 	IA2_STATE_INVALID_ENTRY,
 	IA2_STATE_MODAL,
@@ -103,6 +105,7 @@ from comInterfaces.IAccessible2Lib import (
 import config
 
 
+IAccessible2Interfaces = (IAccessible2, IAccessible2_2, IAccessible2_3)
 _winEventNameCache = {}
 
 
@@ -204,6 +207,9 @@ NAVRELATION_EMBEDS = 0x1009
 # IAccessible2 relations (not included in the typelib)
 IA2_RELATION_FLOWS_FROM = "flowsFrom"
 IA2_RELATION_FLOWS_TO = "flowsTo"
+IA2_RELATION_CONTROLLED_BY = "controlledBy"
+IA2_RELATION_CONTROLLER_FOR = "controllerFor"
+
 
 # A place to store live IAccessible NVDAObjects, that can be looked up by their window,objectID,
 # childID event params.
@@ -396,14 +402,20 @@ def normalizeIAccessible(pacc, childID=0):
 	if childID == 0 and not isinstance(pacc, IAccessible2):
 		try:
 			s = pacc.QueryInterface(IServiceProvider)
-			pacc2 = s.QueryService(IAccessible._iid_, IAccessible2)
-			if not pacc2:
-				# QueryService should fail if IA2 is not supported, but some applications such as AIM 7 misbehave
-				# and return a null COM pointer. Treat this as if QueryService failed.
-				raise ValueError
-			pacc = pacc2
-		except:  # noqa: E722 Bare except
+		except COMError:
 			pass
+		else:
+			for interface in reversed(IAccessible2Interfaces):
+				try:
+					pacc2 = s.QueryService(IAccessible._iid_, interface)
+					if not pacc2:
+						# QueryService should fail if IA2 is not supported, but some applications such as AIM 7 misbehave and return a null COM pointer.
+						# Treat this as if QueryService failed.
+						raise ValueError
+					pacc=pacc2
+					break
+				except (ValueError, COMError):
+					continue
 	return pacc
 
 

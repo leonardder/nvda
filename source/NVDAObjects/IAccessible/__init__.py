@@ -4,7 +4,7 @@
 #See the file COPYING for more details.
 
 from comtypes.automation import IEnumVARIANT, VARIANT
-from comtypes import COMError, IServiceProvider, GUID
+from comtypes import COMError, IUnknown, IServiceProvider, GUID
 from comtypes.hresult import S_OK, S_FALSE
 import ctypes
 import os
@@ -1429,7 +1429,39 @@ the NVDAObject for IAccessible
 			raise NotImplementedError
 		return list(relations)
 
+	def _getIA2RelationTargets(self, relationType: str, requestedTargets: int = 0):
+		if not isinstance(self.IAccessibleObject, IAccessibleHandler.IAccessible2_2):
+			raise NotImplementedError
+		# A bug in Chrome causes a buffer overrun if requestedTargets is less than the
+		# total number of targets the node has.
+		correctedRequestedTargets = 0 if self.windowClassName.startswith("Chrome") else requestedTargets
+		try:
+			targets, nTargets = self.IAccessibleObject.relationTargetsOfType(relationType, correctedRequestedTargets)
+		except COMError:
+			raise NotImplementedError
+		if not nTargets:
+			return ()
+		if requestedTargets > 0:
+			nTargets = min(requestedTargets, nTargets)
+		try:
+			return tuple(
+				IAccessible(
+					IAccessibleObject=IAccessibleHandler.normalizeIAccessible(targets[i]),
+					IAccessibleChildID=0
+				)
+				for i in range(nTargets)
+			)
+		finally:
+			ctypes.windll.ole32.CoTaskMemFree(targets)
+
 	def _getIA2RelationFirstTarget(self, relationType):
+		try:
+			targets = self._getIA2RelationTargets(relationType, 1)
+		except (COMError, NotImplementedError):
+			pass
+		else:
+			if targets:
+				return targets[0]
 		for relation in self._IA2Relations:
 			try:
 				if relation.relationType == relationType:
@@ -1443,6 +1475,12 @@ the NVDAObject for IAccessible
 
 	def _get_flowsFrom(self):
 		return self._getIA2RelationFirstTarget(IAccessibleHandler.IA2_RELATION_FLOWS_FROM)
+
+	def _get_controllerFor(self):
+		return self._getIA2RelationTargets(IAccessibleHandler.IA2_RELATION_CONTROLLER_FOR)
+
+	def _get_controlledBy(self):
+		return self._getIA2RelationTargets(IAccessibleHandler.IA2_RELATION_CONTROLLED_BY)
 
 	def event_valueChange(self):
 		if isinstance(self, EditableTextWithAutoSelectDetection):
