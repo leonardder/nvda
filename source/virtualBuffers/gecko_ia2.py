@@ -118,6 +118,11 @@ class Gecko_ia2_TextInfo(VirtualBufferTextInfo):
 			attrs['level']=level
 		if landmark:
 			attrs["landmark"]=landmark
+
+		for attr in ("IAccessibleRelation::controllerFor", "IAccessibleRelation::controlledBY"):
+			attrVal = attrs.get(attr)
+			if attrVal is not None:
+				attrs[attr] = [int(ID) for ID in attrVal.split(",")]
 		return super(Gecko_ia2_TextInfo,self)._normalizeControlField(attrs)
 
 	def _normalizeFormatField(self, attrs):

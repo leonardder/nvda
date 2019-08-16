@@ -41,6 +41,10 @@ class GeckoVBufBackend_t: public VBufBackend_t {
 	std::wstring toolkitName;
 
 	std::optional< LabelInfo > getLabelInfo(IAccessible2* pacc2);
+
+	std::unique_ptr<CComPtr<IAccessible2>[]> getRelationTargets(IAccessible2_2* pacc, const wchar_t* relation, long& nTargets);
+	void fillRelationTargetInfo(VBufStorage_controlFieldNode_t* node, IAccessible2_2* pacc, const wchar_t* relation);
+
 	CComPtr<IAccessible2> getLabelElement(IAccessible2_2* element);
 	CComPtr<IAccessible2> getSelectedItem(IAccessible2* container,
 		const std::map<std::wstring, std::wstring>& attribs);

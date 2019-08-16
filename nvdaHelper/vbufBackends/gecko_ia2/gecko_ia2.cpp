@@ -33,34 +33,70 @@ http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
 using namespace std;
 
-CComPtr<IAccessible2> GeckoVBufBackend_t::getLabelElement(IAccessible2_2* element) {
+unique_ptr<CComPtr<IAccessible2>[]> GeckoVBufBackend_t::getRelationTargets(IAccessible2_2* pacc, const wchar_t* relation, long& nTargets){
 	IUnknown** ppUnk=nullptr;
-	long nTargets=0;
-	// We only need to request one relation target
-	int numRelations=1;
-	// However, a bug in Chrome causes a buffer overrun if numRelations is less than the total number of targets the node has.
-	// Therefore, If this is Chrome, request all targets (by setting numRelations to 0) as this works around the bug.
+	long maxTargets=nTargets;
+	long requestedTargets=nTargets;
+	// A bug in Chrome causes a buffer overrun if requestedTargets is less than the total number of targets the node has.
+	// Therefore, If this is Chrome, request all targets (by setting requestedTargets to 0) as this works around the bug.
 	// There is no major performance hit to fetch all targets in Chrome as Chrome is already fetching all targets either way.
 	// In Firefox there would be extra cross-proc calls.
 	if(this->toolkitName.compare(L"Chrome")==0) {
-		numRelations=0;
+		requestedTargets=0;
 	}
 	// the relation type string *must* be passed correctly as a BSTR otherwise we can see crashes in 32 bit Firefox.
-	HRESULT res=element->get_relationTargetsOfType(CComBSTR(IA2_RELATION_LABELLED_BY),numRelations,&ppUnk,&nTargets);
-	if(res!=S_OK) return nullptr;
+	auto res=pacc->get_relationTargetsOfType(CComBSTR(relation),requestedTargets,&ppUnk,&nTargets);
+	if(res!=S_OK){
+		return nullptr;
+	}
+	if(maxTargets>0){
+		nTargets=min(nTargets, maxTargets);
+	}
 	// Grab all the returned IUnknowns and store them as smart pointers within a smart pointer array 
 	// so that any further returns will correctly release all the objects. 
-	auto ppUnk_smart=make_unique<CComPtr<IUnknown>[]>(nTargets);
-	for(int i=0;i<nTargets;++i) {
-		ppUnk_smart[i].Attach(ppUnk[i]);
+	auto ppUnk_smart=make_unique<CComPtr<IAccessible2>[]>(nTargets);
+	for(long i=0;i<nTargets;++i) {
+		ppUnk_smart[i].Attach(CComQIPtr<IAccessible2>(ppUnk[i]));
 	}
 	// we can now free the memory that Gecko  allocated to give us  the IUnknowns
 	CoTaskMemFree(ppUnk);
 	if(nTargets==0) {
-		LOG_DEBUG(L"relationTargetsOfType for IA2_RELATION_LABELLED_BY found no targets");
+		LOG_DEBUG(L"relationTargetsOfType for IA2 relation "<<relation<<L" found no targets");
 		return nullptr;
 	}
-	return CComQIPtr<IAccessible2>(ppUnk_smart[0]);
+	return ppUnk_smart;
+}
+
+inline void GeckoVBufBackend_t::fillRelationTargetInfo(VBufStorage_controlFieldNode_t* node, IAccessible2_2* pacc, const wchar_t* relation){
+	long nTargets = 0;  // Request all targets
+	auto ppUnk_smart=getRelationTargets(pacc, relation, nTargets);
+	if(!ppUnk_smart){
+		return;
+	}
+	int ID;
+	wostringstream s, ss;
+	for(long i=0;i<nTargets;++i) {
+		// Get ID -- IAccessible2 uniqueID
+		if(ppUnk_smart[i]->get_uniqueID((long*)&ID)!=S_OK) {
+			LOG_DEBUG(L"pacc->get_uniqueID failed");
+			continue;
+		}
+		if(i>0) {
+			ss<<L",";
+		}
+		ss<<ID;
+	}
+	s<<L"IAccessibleRelation::"<<relation;
+	node->addAttribute(s.str(), ss.str());
+}
+
+CComPtr<IAccessible2> GeckoVBufBackend_t::getLabelElement(IAccessible2_2* element) {
+	long nTargets=1;
+	auto ppUnk_smart=getRelationTargets(element, IA2_RELATION_LABELLED_BY, nTargets);
+	if(!ppUnk_smart){
+		return nullptr;
+	}
+	return ppUnk_smart[0];
 }
 
 const wchar_t EMBEDDED_OBJ_CHAR = 0xFFFC;
@@ -253,6 +289,7 @@ using OptionalLabelInfo = optional< LabelInfo >;
 OptionalLabelInfo GeckoVBufBackend_t::getLabelInfo(IAccessible2* pacc2) {
 	CComQIPtr<IAccessible2_2> pacc2_2=pacc2;
 	if (!pacc2_2) return OptionalLabelInfo();
+
 	auto targetAcc=getLabelElement(pacc2_2);
 	if(!targetAcc) return OptionalLabelInfo();
 	CComVariant child;
@@ -592,6 +629,7 @@ VBufStorage_fieldNode_t* GeckoVBufBackend_t::fillVBuf(
 	IA2AttribsMapIt = IA2AttribsMap.find(L"explicit-name");
 	// Whether the name of this node has been explicitly set (as opposed to calculated by descendant)
 	const bool nameIsExplicit = IA2AttribsMapIt != IA2AttribsMap.end() && IA2AttribsMapIt->second == L"true";
+
 	// Whether the name is the content of this node.
 	optional<LabelInfo> labelInfo_;
 	// A version of the getIdForVisibleLabel function that caches its result
@@ -635,6 +673,12 @@ VBufStorage_fieldNode_t* GeckoVBufBackend_t::fillVBuf(
 	// We must exclude tables from this though as table summaries / captions are handled very specifically
 	if(nameIsExplicit && !nameIsContent && (role != ROLE_SYSTEM_TABLE) && !labelVisible) {
 		parentNode->addAttribute(L"alwaysReportName",L"true");
+	}
+
+	if(pacc2_2) {
+		// Add information about controllerFor and controlledBy targets for aria-controls.
+		fillRelationTargetInfo(parentNode, pacc2_2, IA2_RELATION_CONTROLLER_FOR);
+		fillRelationTargetInfo(parentNode, pacc2_2, IA2_RELATION_CONTROLLED_BY);
 	}
 
 	IAccessibleText* paccText=NULL;
