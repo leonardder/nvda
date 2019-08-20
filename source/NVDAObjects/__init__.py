@@ -456,6 +456,10 @@ class NVDAObject(documentBase.TextContainerObject, baseObject.ScriptableObject, 
 		"""Retrieves the object/s that this object controls."""
 		return []
 
+	def _get_controlledBy(self):
+		"""Retrieves the object/s this object is controlled by."""
+		return []
+
 	def _get_actionCount(self):
 		"""Retrieves the number of actions supported by this object."""
 		return 0
