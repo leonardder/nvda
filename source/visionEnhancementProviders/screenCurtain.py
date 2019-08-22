@@ -11,6 +11,9 @@ import vision
 import winVersion
 from ctypes import Structure, windll, c_float, POINTER, WINFUNCTYPE, WinError
 from ctypes.wintypes import BOOL
+import driverHandler
+import wx
+import gui
 
 
 class MAGCOLOREFFECT(Structure):
@@ -66,6 +69,19 @@ class VisionEnhancementProvider(vision.providerBase.VisionEnhancementProvider):
 	description = _("Screen Curtain")
 	supportedRoles = frozenset([vision.constants.Role.COLORENHANCER])
 
+	# Default settings for parameters
+	warnOnLoad = True
+
+	supportedSettings = [
+		driverHandler.BooleanDriverSetting(
+			"warnOnLoad",
+			# Translators: Description for a screen curtain setting that shows a warning when loading
+			# the screen curtain.
+			_(f"Show a warning when {description} is loaded"),
+			defaultVal=warnAtLoad
+		),
+	]
+
 	@classmethod
 	def canStart(cls):
 		return winVersion.isFullScreenMagnificationAvailable()
@@ -73,6 +89,13 @@ class VisionEnhancementProvider(vision.providerBase.VisionEnhancementProvider):
 	def __init__(self):
 		super(VisionEnhancementProvider, self).__init__()
 		Magnification.MagInitialize()
+		# Execute postInit with a CallAfter to ensure that the config spec is coupled with the config section.
+		# It also allows us to show a message box and ensures that happens on the main thread.
+		wx.CallAfter(self.postInit)
+
+	def postInit(self):
+		if warnOnLoad:
+			pass
 		Magnification.MagSetFullscreenColorEffect(TRANSFORM_BLACK)
 
 	def terminate(self):
