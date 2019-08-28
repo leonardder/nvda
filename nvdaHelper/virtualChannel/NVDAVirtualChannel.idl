@@ -1,0 +1,24 @@
+import "oaidl.idl";
+import "ocidl.idl";
+import "tsvirtualchannels.idl";
+
+[
+	uuid(B960B4B1-73D8-4248-850B-0D6A24BC46FB),
+	version(1.0),
+]
+library NVDAVirtualChannel
+{
+	[
+		uuid(2FC16BBC-2B53-4554-B311-B66E2B291D90),
+		helpstring("NVDA Virtual Channel Plugin Class")
+	]
+	coclass NVDA
+	{
+		[default] interface IWTSPlugin;
+		interface IWTSListener;
+		interface IWTSListenerCallback;
+		interface IWTSVirtualChannelCallback;
+		interface IWTSVirtualChannelManager;
+		interface IWTSVirtualChannel;
+	};
+};

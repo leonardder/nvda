@@ -173,6 +173,14 @@ env.Install(libInstallDir,iSimpleDomRPCStubs[0]) #proxy dll
 if TARGET_ARCH=='x86':
 	env.Install(sourceTypelibDir,iSimpleDomRPCStubs[1]) #typelib
 
+virtualChannelRPCStubs=env.SConscript('virtualChannel/sconscript')
+Export('virtualChannelRPCStubs')
+#if signExec:
+#	env.AddPostAction(virtualChannelRPCStubs[0], [signExec])
+#env.Install(libInstallDir, virtualChannelRPCStubs[0]) #proxy dll
+if TARGET_ARCH=='x86':
+	env.Install(sourceTypelibDir, virtualChannelRPCStubs[0]) #typelib
+
 mathPlayerRPCStubs=env.SConscript('mathPlayer_sconscript')
 if TARGET_ARCH=='x86':
 	env.Install(sourceTypelibDir,mathPlayerRPCStubs[0]) #typelib
