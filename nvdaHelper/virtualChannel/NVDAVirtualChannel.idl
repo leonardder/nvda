@@ -10,15 +10,16 @@ library NVDAVirtualChannel
 {
 	[
 		uuid(2FC16BBC-2B53-4554-B311-B66E2B291D90),
+		version(1.0),
 		helpstring("NVDA Virtual Channel Plugin Class")
 	]
 	coclass NVDA
 	{
 		[default] interface IWTSPlugin;
-		interface IWTSListener;
 		interface IWTSListenerCallback;
-		interface IWTSVirtualChannelCallback;
-		interface IWTSVirtualChannelManager;
-		interface IWTSVirtualChannel;
 	};
+	interface IWTSListener;
+	interface IWTSVirtualChannelCallback;
+	interface IWTSVirtualChannelManager;
+	interface IWTSVirtualChannel;
 };
