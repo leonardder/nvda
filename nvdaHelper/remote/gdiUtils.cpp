@@ -49,3 +49,4 @@ void screenPointsToDCPoints(HDC hdc, POINT* points, int count) {
 		points[i].y-=dcOrgPoint.y;
 	}
 }
+

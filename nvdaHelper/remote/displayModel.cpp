@@ -19,6 +19,7 @@ http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 #include <set>
 #include <algorithm>
 #include <common/xml.h>
+#include <common/GDIObject.h>
 #include "nvdaControllerInternal.h"
 #include "gdiUtils.h"
 #include <common/log.h>
@@ -150,12 +151,19 @@ void displayModel_t::clearRectangle(const RECT& rect, BOOL clearForText, HDC cli
 	set<displayModelChunk_t*> chunksForInsertion;
 	displayModelChunksByPointMap_t::iterator i=chunksByYX.begin();
 	RECT tempRect;
+	GDIObject clipRgn;
+	if(clipRgnHdc) {
+		clipRgn = CreateRectRgn(0, 0, 0, 0);
+		if(GetClipRgn(clipRgnHdc,clipRgn)!=1){
+			clipRgn.destroy();
+		}
+	}
 	//If the rectangle we are clearing completely covers any current focus rectangle, then get rid of the focus rectangle.
 	if(
 		// A focus rectangle is currently set.
 		focusRect
 		// Either we don't check for clipping or the focus rectangle is part of the clipping region.
-		&&!(clipRgnHdc!=NULL&&RectVisible(clipRgnHdc,focusRect)==FALSE)
+		&&!(clipRgn&&RectInRegion(clipRgn,focusRect)==FALSE)
 		// The focus rectangle falls completely within the rectangle to clear.
 		&&IntersectRect(&tempRect,&rect,focusRect)
 		&&EqualRect(&tempRect,focusRect)
@@ -170,13 +178,10 @@ void displayModel_t::clearRectangle(const RECT& rect, BOOL clearForText, HDC cli
 		int baseline=i->first.first;
 		if(IntersectRect(&tempRect,&rect,&(chunk->rect))) {
 			//The clearing rectangle intercects the chunk's rectangle in some way.
-			if(clipRgnHdc != NULL) {
+			if(clipRgn) {
 				tempLogicalRect = tempRect;
-				screenPointsToDCPoints(clipRgnHdc,(LPPOINT)&tempLogicalRect,2);
-				//RectVisible is very poorly documented on the web.
-				//It can return -1 for an invalid hdc, which is not documented,
-				//and is able to return several other integers, while we expect a BOOL.
-				if(RectVisible(clipRgnHdc,&tempLogicalRect)==FALSE) {
+				//screenPointsToDCPoints(clipRgnHdc,(LPPOINT)&tempLogicalRect,2);
+				if(!RectInRegion(clipRgn,&tempLogicalRect)) {
 					//This rectangle is no part of the clipping region, leave it alone.
 					i=nextI;
 					continue;
