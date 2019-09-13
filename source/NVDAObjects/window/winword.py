@@ -713,7 +713,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 		if res or not text:
 			log.debugWarning("winword_getTextInRange failed with %d"%res)
 			return [self.text]
-		commandList=XMLFormatting.XMLTextParser().parse(text.value)
+		commandList = XMLFormatting.XMLToFields(text.value)
 		for index,item in enumerate(commandList):
 			if isinstance(item,textInfos.FieldCommand):
 				field=item.field

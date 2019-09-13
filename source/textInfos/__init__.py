@@ -17,6 +17,7 @@ import baseObject
 import config
 import controlTypes
 import locationHelper
+from typing import Dict, List, Optional
 
 class Field(dict):
 	"""Provides information about a piece of text."""
@@ -277,6 +278,24 @@ class TextInfo(baseObject.AutoPropertyObject):
 		""" 
 		return [self.text]
 
+	def getTextWithFieldsAsXML(
+			self,
+			formatConfig: Optional[Dict[str, bool]] = None,
+			attributes: Optional[List[str]] = None
+	) -> str:
+		"""Retreaves the text in this range, as well as any control/format fields associated therewith.
+		The result is serialized to XML.
+		@param formatConfig: Document formatting configuration,
+			useful if you wish to force a particular configuration for a particular task.
+		@param attributes: A list of attributes to serialize.
+			C{None} to process all attributes
+		"""
+		from . import XMLFormatting
+		return XMLFormatting.fieldsToXML(
+			self.getTextWithFields(formatConfig=formatConfig),
+			attributes=attributes
+		)
+
 	def _get_locationText(self):
 		"""A message that explains the location of the text position in friendly terms."""
 		try:
@@ -521,6 +540,7 @@ class TextInfo(baseObject.AutoPropertyObject):
 		@raise LookupError: If MathML can't be retrieved for this field.
 		"""
 		raise NotImplementedError
+
 
 RE_EOL = re.compile("\r\n|[\n\r]")
 def convertToCrlf(text):

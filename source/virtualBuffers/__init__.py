@@ -268,7 +268,7 @@ class VirtualBufferTextInfo(browseMode.BrowseModeDocumentTextInfo,textInfos.offs
 		text=NVDAHelper.VBuf_getTextInRange(self.obj.VBufHandle,start,end,True)
 		if not text:
 			return ""
-		commandList=XMLFormatting.XMLTextParser().parse(text)
+		commandList = XMLFormatting.XMLToFields(text)
 		for index in range(len(commandList)):
 			if isinstance(commandList[index],textInfos.FieldCommand):
 				field=commandList[index].field

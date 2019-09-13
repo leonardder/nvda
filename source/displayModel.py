@@ -298,7 +298,7 @@ class DisplayModelTextInfo(OffsetsTextInfo):
 		if not text:
 			return [], [], [], []
 		text="<control>%s</control>"%text
-		commandList=XMLFormatting.XMLTextParser().parse(text)
+		commandList = XMLFormatting.XMLToFields(text)
 		curFormatField=None
 		lastEndOffset=0
 		lineStartOffset=0
