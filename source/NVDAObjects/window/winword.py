@@ -21,7 +21,7 @@ import scriptHandler
 import languageHandler
 import ui
 import NVDAHelper
-import XMLFormatting
+from textInfos import XMLFormatting
 from logHandler import log
 import winUser
 import oleacc

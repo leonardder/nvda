@@ -14,7 +14,7 @@ import weakref
 import wx
 import review
 import NVDAHelper
-import XMLFormatting
+from textInfos import XMLFormatting
 import scriptHandler
 from scriptHandler import isScriptWaiting, willSayAllResume
 import speech

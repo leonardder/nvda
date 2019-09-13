@@ -10,7 +10,7 @@ from comtypes import BSTR
 import unicodedata
 import math
 import colors
-import XMLFormatting
+from textInfos import XMLFormatting
 import api
 import winUser
 import mouseHandler
