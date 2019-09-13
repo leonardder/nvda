@@ -1,10 +1,10 @@
-#XMLFormatting.py
-#A part of NonVisual Desktop Access (NVDA)
-#Copyright (C) 2008-2019 NV Access Limited, Babbage B.V.
-#This file is covered by the GNU General Public License.
-#See the file COPYING for more details.
+# A part of NonVisual Desktop Access (NVDA)
+# Copyright (C) 2008-2019 NV Access Limited, Babbage B.V.
+# This file is covered by the GNU General Public License.
+# See the file COPYING for more details.
 
 from xml.parsers import expat
+from xml.etree import ElementTree
 from . import ControlField, FormatField, FieldCommand
 from logHandler import log
 from textUtils import WCHAR_ENCODING, isLowSurrogate
@@ -70,3 +70,28 @@ class XMLTextParser(object):
 		except:
 			log.error("XML: %s"%XMLText,exc_info=True)
 		return self._commandList
+
+def createXMLTextTree(textWithFields):
+	builder = ElementTree.TreeBuilder()
+	for i, field in enumerate(textWithFields):
+		if isinstance(field, FieldCommand):
+			attrs = {}
+			if field.field:
+				for attr, val in field.field.items():
+					if isinstance(val, bool):
+						val = str(int(val))
+					elif not isinstance(val, str):
+						val = str(val)
+					attrs[attr] = val
+			if field.command == "formatChange":
+				builder.start("text", attrs)
+			elif field.command == "controlStart":
+				builder.start("control", attrs)
+			elif field.command == "controlEnd":
+				builder.end("control")
+		elif isinstance(field, str):
+			builder.data(field)
+			next = i + 1
+			if next >= len(textWithFields) or isinstance(textWithFields[next], FieldCommand):
+				builder.end("text")
+	return ElementTree.tostring(builder.close(), encoding="unicode")
