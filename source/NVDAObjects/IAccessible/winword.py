@@ -1,7 +1,7 @@
-#A part of NonVisual Desktop Access (NVDA)
-#Copyright (C) 2006-2012 NVDA Contributors
-#This file is covered by the GNU General Public License.
-#See the file COPYING for more details.
+# A part of NonVisual Desktop Access (NVDA)
+# Copyright (C) 2006-2019 NV Access Limited, Babbage B.V.
+# This file is covered by the GNU General Public License.
+# See the file COPYING for more details.
 
 from comtypes import COMError
 import comtypes.automation
@@ -23,7 +23,7 @@ from ..behaviors import EditableTextWithoutAutoSelectDetection
 from NVDAObjects.window.winword import *
 
 class WordDocument(IAccessible,EditableTextWithoutAutoSelectDetection,WordDocument):
- 
+
 	treeInterceptorClass=WordDocumentTreeInterceptor
 	shouldCreateTreeInterceptor=False
 	TextInfo=WordDocumentTextInfo
@@ -44,12 +44,15 @@ class WordDocument(IAccessible,EditableTextWithoutAutoSelectDetection,WordDocume
 	ignoreFormatting=False
 
 	def event_caret(self):
+		log.debug("Caret event, getting selection")
 		curSelectionPos=self.makeTextInfo(textInfos.POSITION_SELECTION)
 		lastSelectionPos=getattr(self,'_lastSelectionPos',None)
 		self._lastSelectionPos=curSelectionPos
 		if lastSelectionPos:
 			if curSelectionPos._rangeObj.isEqual(lastSelectionPos._rangeObj):
+				log.debug("Last selection position is equal to current selection position")
 				return
+			log.debug("Last selection position differs from current selection position")
 		super(WordDocument,self).event_caret()
 
 	def _get_role(self):

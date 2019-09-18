@@ -1,8 +1,7 @@
-#appModules/winword.py
-#A part of NonVisual Desktop Access (NVDA)
-#Copyright (C) 2006-2017 NV Access Limited, Manish Agrawal, Derek Riemer, Babbage B.V.
-#This file is covered by the GNU General Public License.
-#See the file COPYING for more details.
+# A part of NonVisual Desktop Access (NVDA)
+# Copyright (C) 2006-2019 NV Access Limited, Manish Agrawal, Derek Riemer, Babbage B.V.
+# This file is covered by the GNU General Public License.
+# See the file COPYING for more details.
 
 import ctypes
 import time
@@ -656,8 +655,9 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			return
 		self._rangeObj.setRange(lineStart.value,lineEnd.value)
 
-	def __init__(self,obj,position,_rangeObj=None):
+	def __init__(self, obj, position, _rangeObj=None):
 		super(WordDocumentTextInfo,self).__init__(obj,position)
+		log.debug(f"Creating WordDocumentTextInfo for position {position!r}")
 		if _rangeObj:
 			self._rangeObj=_rangeObj.Duplicate
 			return
@@ -689,8 +689,9 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			self._rangeObj=position._rangeObj.duplicate
 		else:
 			raise NotImplementedError("position: %s"%position)
+		log.debug("End of WordDocumentTextInfo constructor")
 
-	def getTextWithFields(self,formatConfig=None):
+	def getTextWithFields(self, formatConfig=None):
 		if self.isCollapsed: return []
 		if self.obj.ignoreFormatting:
 			return [self.text]
@@ -709,9 +710,22 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			formatConfigFlags&=~formatConfigFlagsMap['reportRevisions']
 		if self.obj.ignorePageNumbers:
 			formatConfigFlags&=~formatConfigFlagsMap['reportPage']
-		res=NVDAHelper.localLib.nvdaInProcUtils_winword_getTextInRange(self.obj.appModule.helperLocalBindingHandle,self.obj.documentWindowHandle,startOffset,endOffset,formatConfigFlags,ctypes.byref(text))
+		log.debug(
+			"getTextWithFields: "
+			f"start={startOffset}, "
+			f"end={endOffset}, "
+			f"formatConfigFlags={formatConfigFlags}"
+		)
+		res = NVDAHelper.localLib.nvdaInProcUtils_winword_getTextInRange(
+			self.obj.appModule.helperLocalBindingHandle,
+			self.obj.documentWindowHandle,
+			startOffset,
+			endOffset,
+			formatConfigFlags,
+			ctypes.byref(text)
+		)
 		if res or not text:
-			log.debugWarning("winword_getTextInRange failed with %d"%res)
+			log.debugWarning(f"winword_getTextInRange failed with {res}")
 			return [self.text]
 		commandList=XMLFormatting.XMLTextParser().parse(text.value)
 		for index,item in enumerate(commandList):
@@ -722,13 +736,14 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 				elif isinstance(field,textInfos.FormatField):
 					item.field=self._normalizeFormatField(field,extraDetail=extraDetail)
 			elif index>0 and isinstance(item,str) and item.isspace():
-				 #2047: don't expose language for whitespace as its incorrect for east-asian languages 
+				#2047: don't expose language for whitespace as its incorrect for east-asian languages 
 				lastItem=commandList[index-1]
 				if isinstance(lastItem,textInfos.FieldCommand) and isinstance(lastItem.field,textInfos.FormatField):
 					try:
 						del lastItem.field['language']
 					except KeyError:
 						pass
+		log.debug(f"End of getTextWithFields, retrieved {len(commandList)} fields")
 		return commandList
 
 	def _normalizeControlField(self,field):
@@ -880,6 +895,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 					unit=textInfos.UNIT_CHARACTER
 			except COMError:
 				pass
+		log.debug(f"Expanding to {unit}")
 		if unit==textInfos.UNIT_LINE:
 			self._expandToLineAtCaret()
 		elif unit==textInfos.UNIT_CHARACTER:
@@ -977,6 +993,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 		oldOffset=self._rangeObj.end if endPoint=="end" else self._rangeObj.start
 		newOffset=ctypes.c_long()
 		# Try moving by line making use of the selection temporarily
+		log.debug("Moving by line using nvdaInProcUtils_winword_moveByLine")
 		res=NVDAHelper.localLib.nvdaInProcUtils_winword_moveByLine(self.obj.appModule.helperLocalBindingHandle,self.obj.documentWindowHandle,oldOffset,1 if direction<0 else 0,ctypes.byref(newOffset))
 		if res==0:
 			res=direction
