@@ -646,6 +646,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			return
 
 	def _expandToLineAtCaret(self):
+		log.debug("Expanding to line at caret")
 		lineStart=ctypes.c_int()
 		lineEnd=ctypes.c_int()
 		res=NVDAHelper.localLib.nvdaInProcUtils_winword_expandToLine(self.obj.appModule.helperLocalBindingHandle,self.obj.documentWindowHandle,self._rangeObj.start,ctypes.byref(lineStart),ctypes.byref(lineEnd))
@@ -653,7 +654,8 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			log.debugWarning("winword_expandToLine failed")
 			self._rangeObj.expand(wdParagraph)
 			return
-		self._rangeObj.setRange(lineStart.value,lineEnd.value)
+		self._rangeObj.setRange(lineStart.value, lineEnd.value)
+		log.debug("Expanded to line at caret")
 
 	def __init__(self, obj, position, _rangeObj=None):
 		super(WordDocumentTextInfo,self).__init__(obj,position)
@@ -904,8 +906,10 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			self._rangeObj.Expand(NVDAUnitsToWordUnits[unit])
 		else:
 			raise NotImplementedError("unit: %s"%unit)
+		log.debug(f"Expanded to {unit}")
 
 	def compareEndPoints(self,other,which):
+		log.debug(f"compareEndPoints: which={which!r}")
 		if which=="startToStart":
 			diff=self._rangeObj.Start-other._rangeObj.Start
 		elif which=="startToEnd":
@@ -916,6 +920,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			diff=self._rangeObj.End-other._rangeObj.End
 		else:
 			raise ValueError("bad argument - which: %s"%which)
+		log.debug(f"end of compareEndPoints: which={which!r}, diff={diff}")
 		if diff<0:
 			diff=-1
 		elif diff>0:
@@ -923,6 +928,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 		return diff
 
 	def setEndPoint(self,other,which):
+		log.debug(f"setEndPoint: which={which!r}")
 		if which=="startToStart":
 			self._rangeObj.Start=other._rangeObj.Start
 		elif which=="startToEnd":
@@ -933,6 +939,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			self._rangeObj.End=other._rangeObj.End
 		else:
 			raise ValueError("bad argument - which: %s"%which)
+		log.debug(f"End of setEndPoint: which={which!r}")
 
 	def _get_isCollapsed(self):
 		if self._rangeObj.Start==self._rangeObj.End:
@@ -941,6 +948,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			return False
 
 	def collapse(self,end=False):
+		log.debug(f"collapse: end={end}")
 		if end:
 			oldEndOffset=self._rangeObj.end
 		self._rangeObj.collapse(wdCollapseEnd if end else wdCollapseStart)
@@ -951,6 +959,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			# For an example of this see sayAll (specifically readTextHelper_generator in sayAllHandler.py)
 			if newEndOffset < oldEndOffset :
 				raise RuntimeError
+		log.debug(f"End of collapse: end={end}")
 
 	def copy(self):
 		return WordDocumentTextInfo(self.obj,None,_rangeObj=self._rangeObj)
@@ -962,6 +971,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 		return text
 
 	def _move(self,unit,direction,endPoint=None,_rangeObj=None):
+		log.debug(f"_move: unit={unit!r}, direction={direction}, endPoint={endPoint!r}")
 		if not _rangeObj:
 			_rangeObj=self._rangeObj
 		if unit in NVDAUnitsToWordUnits:
@@ -983,6 +993,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			and (_rangeObj.start+1) == self.obj.WinwordDocumentObject.range().end # character after the range start is the end of the document range
 			):
 			return 0
+		log.debug(f"End of _move: unit={unit!r}, direction={direction}, res={res}")
 		return res
 
 	def move(self,unit,direction,endPoint=None):
@@ -1001,6 +1012,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 		if direction<0 and not endPoint and newOffset==oldOffset:
 			# Moving backwards by line seemed to not move.
 			# Therefore fallback to moving back a character, expanding to line and collapsing to start instead.
+			log.debug("Moving backwards by line seemed to not move")
 			self.move(textInfos.UNIT_CHARACTER,-1)
 			self.expand(unit)
 			self.collapse()
@@ -1008,12 +1020,14 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			# Moving forward by line seems to have wrapped back before the original position
 			# This can happen in some tables with merged rows.
 			# Try moving forward by cell, but if that fails, jump past the entire table.
+			log.debug("Moving forward by line seems to have wrapped back before the original position")
 			res=self.move(textInfos.UNIT_CELL,direction,endPoint)
 			if res==0:
 				self.expand(textInfos.UNIT_TABLE)
 				self.collapse(end=True)
 		else:
 			# the move by line using the selection succeeded. Therefore update this TextInfo's position.
+			log.debug(f"Move by line using the selection succeeded. endPoint={endPoint!r}")
 			if not endPoint:
 				self._rangeObj.setRange(newOffset,newOffset)
 			elif endPoint=="start":
