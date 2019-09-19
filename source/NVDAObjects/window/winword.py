@@ -693,7 +693,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			raise NotImplementedError("position: %s"%position)
 		log.debug("End of WordDocumentTextInfo constructor")
 
-	def getTextWithFields(self, formatConfig=None):
+	def getTextWithFields(self,formatConfig=None):
 		if self.isCollapsed: return []
 		if self.obj.ignoreFormatting:
 			return [self.text]
@@ -738,7 +738,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 				elif isinstance(field,textInfos.FormatField):
 					item.field=self._normalizeFormatField(field,extraDetail=extraDetail)
 			elif index>0 and isinstance(item,str) and item.isspace():
-				#2047: don't expose language for whitespace as its incorrect for east-asian languages 
+				# #2047: don't expose language for whitespace as its incorrect for east-asian languages
 				lastItem=commandList[index-1]
 				if isinstance(lastItem,textInfos.FieldCommand) and isinstance(lastItem.field,textInfos.FormatField):
 					try:
