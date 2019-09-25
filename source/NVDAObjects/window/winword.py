@@ -694,7 +694,10 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 		log.debug("End of WordDocumentTextInfo constructor")
 
 	def getTextWithFields(self,formatConfig=None):
-		if self.isCollapsed: return []
+		log.debug("Start of getTextWithFields")
+		if self.isCollapsed:
+			log.debug("getTextWithFields: collapsed, returning empty list")
+			return []
 		if self.obj.ignoreFormatting:
 			return [self.text]
 		extraDetail=formatConfig.get('extraDetail',False) if formatConfig else False
@@ -942,10 +945,10 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 		log.debug(f"End of setEndPoint: which={which!r}")
 
 	def _get_isCollapsed(self):
-		if self._rangeObj.Start==self._rangeObj.End:
-			return True
-		else:
-			return False
+		log.debug("isCollapsed")
+		res = self._rangeObj.Start == self._rangeObj.End:
+		log.debug(f"End of isCollapsed: result={res}")
+		return res
 
 	def collapse(self,end=False):
 		log.debug(f"collapse: end={end}")
