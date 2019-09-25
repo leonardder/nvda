@@ -59,30 +59,10 @@ class InvalidNVDAObject(RuntimeError):
 	Therefore, L{DynamicNVDAObjectType} will return C{None} if this exception is raised.
 	"""
 
-class DynamicNVDAObjectType(baseObject.ScriptableObject.__class__):
-	_dynamicClassCache = {}
-
-	@classmethod
-	def getDynamicClass(cls, bases):
-		# Construct the new class.
-		if len(bases) == 1:
-			# We only have one base, so there's no point in creating a dynamic type.
-			newCls=bases[0]
-		else:
-			bases=tuple(bases)
-			newCls = cls._dynamicClassCache.get(bases, None)
-			if not newCls:
-				name = "Dynamic_{name}".format(
-					name="".join(x.__name__ for x in bases)
-				)
-				newCls = type(name, bases, {"__module__": __name__})
-				cls._dynamicClassCache[bases]=newCls
-		return newCls
+class DynamicNVDAObjectType(baseObject.DynamicScriptableType):
 
 	def initNewSubclass(self, cls, obj):
-		initFunc = cls.__dict__.get("initOverlayClass")
-		if initFunc:
-			initFunc(obj)
+		super().initNewSubclass(cls, obj)
 		# Bind gestures specified on the class.
 		try:
 			obj.bindGestures(getattr(cls, "_%s__gestures" % cls.__name__))
@@ -90,10 +70,7 @@ class DynamicNVDAObjectType(baseObject.ScriptableObject.__class__):
 			pass
 
 	def findOverlayClassesForObject(self, obj, clsList):
-		if hasattr(obj, "findOverlayClasses"):
-			obj.findOverlayClasses(clsList)
-		else:
-			clsList.append(APIClass)
+		super().findOverlayClassesForObject(obj, clsList)
 		# Allow app modules to choose overlay classes.
 		# optimisation: The base implementation of chooseNVDAObjectOverlayClasses does nothing,
 		# so only call this method if it's been overridden.
@@ -104,46 +81,20 @@ class DynamicNVDAObjectType(baseObject.ScriptableObject.__class__):
 			if "chooseNVDAObjectOverlayClasses" in plugin.__class__.__dict__:
 				plugin.chooseNVDAObjectOverlayClasses(obj, clsList)
 
-
-	def mutateObject(self, obj, clsList):
-		# Determine the bases for the new class.
-		bases=[]
-		for index in range(len(clsList)):
-			# A class doesn't need to be a base if it is already implicitly included by being a superclass of a previous base.
-			if index==0 or not issubclass(clsList[index-1],clsList[index]):
-				bases.append(clsList[index])
-		newCls = self.getDynamicClass(bases)
-		oldMro = frozenset(obj.__class__.__mro__)	
-		# Mutate obj into the new class.
-		obj.__class__ = newCls
-		# Apply logic to the new classes in the mro.
-		for cls in reversed(newCls.__mro__):
-			if cls in oldMro:
-				# This class was part of the initially constructed object,
-				# so its constructor would have been called.
-				continue
-			self.initNewSubclass(cls, obj)
-
-	def __call__(self,chooseBestAPI=True,**kwargs):
+	def __call__(self, *args, chooseBestAPI=True, **kwargs):
 		if chooseBestAPI:
 			APIClass=self.findBestAPIClass(kwargs)
 			if not APIClass: return None
 		else:
 			APIClass=self
 
-		# Instantiate the requested class.
 		try:
-			obj=APIClass.__new__(APIClass,**kwargs)
-			obj.APIClass=APIClass
-			if isinstance(obj,self):
-				obj.__init__(**kwargs)
+			obj = baseObject.DynamicType.__call__(APIClass, *args, **kwargs)
 		except InvalidNVDAObject as e:
 			log.debugWarning("Invalid NVDAObject: %s" % e, exc_info=True)
 			return None
 
-		clsList = []
-		self.findOverlayClassesForObject(obj, clsList)
-		self.mutateObject(obj, clsList)
+		obj.APIClass = APIClass
 
 		# Allow app modules to make minor tweaks to the instance.
 		if obj.appModule and hasattr(obj.appModule, "event_NVDAObject_init"):
@@ -151,14 +102,11 @@ class DynamicNVDAObjectType(baseObject.ScriptableObject.__class__):
 
 		return obj
 
-	@classmethod
-	def clearDynamicClassCache(cls):
-		"""Clear the dynamic class cache.
-		This should be called when a plugin is unloaded so that any used overlay classes in the unloaded plugin can be garbage collected.
-		"""
-		cls._dynamicClassCache.clear()
-
-class NVDAObject(documentBase.TextContainerObject, baseObject.ScriptableObject, metaclass=DynamicNVDAObjectType):
+class NVDAObject(
+	documentBase.TextContainerObject,
+	baseObject.DynamicScriptableObject,
+	metaclass=DynamicNVDAObjectType
+):
 	"""NVDA's representation of a single control/widget.
 	Every widget, regardless of how it is exposed by an application or the operating system, is represented by a single NVDAObject instance.
 	This allows NVDA to work with all widgets in a uniform way.
@@ -247,21 +195,6 @@ class NVDAObject(documentBase.TextContainerObject, baseObject.ScriptableObject, 
 		@rtype: boolean
 		"""
 		raise NotImplementedError
- 
-
-	def findOverlayClasses(self, clsList):
-		"""Chooses overlay classes which should be added to this object's class structure after the object has been initially instantiated.
-		After an NVDAObject class (normally an API-level class) is instantiated, this method is called on the instance to choose appropriate overlay classes.
-		This method may use properties, etc. on the instance to make this choice.
-		The object's class structure is then mutated to contain these classes.
-		L{initOverlayClass} is then called for each class which was not part of the initially instantiated object.
-		This process allows an NVDAObject to be dynamically created using the most appropriate NVDAObject subclass at each API level.
-		Classes should be listed with subclasses first. That is, subclasses should generally call super and then append their own classes to the list.
-		For example: Called on an IAccessible NVDAObjectThe list might contain DialogIaccessible (a subclass of IAccessible), Edit (a subclass of Window).
-		@param clsList: The list of classes, which will be modified by this method if appropriate.
-		@type clsList: list of L{NVDAObject}
-		"""
-		clsList.append(NVDAObject)
 
 	beTransparentToMouse=False #:If true then NVDA will never consider the mouse to be on this object, rather it will be on an ancestor.
 

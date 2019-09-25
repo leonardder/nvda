@@ -289,3 +289,98 @@ class ScriptableObject(AutoPropertyObject, metaclass=ScriptableType):
 	#: A value for sleepMode which indicates that NVDA should fully sleep for this object;
 	#: i.e. braille and speech via NVDA controller client is disabled and the user cannot disable sleep mode.
 	SLEEP_FULL = "full"
+
+class DynamicType(AutoPropertyType):
+	_dynamicClassCache = {}
+
+	@classmethod
+	def getDynamicClass(cls, bases):
+		# Construct the new class.
+		if len(bases) == 1:
+			# We only have one base, so there's no point in creating a dynamic type.
+			newCls=bases[0]
+		else:
+			bases=tuple(bases)
+			newCls = cls._dynamicClassCache.get(bases, None)
+			if not newCls:
+				name = "Dynamic_{name}".format(
+					name="".join(x.__name__ for x in bases)
+				)
+				newCls = type(name, bases, {"__module__": __name__})
+				cls._dynamicClassCache[bases]=newCls
+		return newCls
+
+	def initNewSubclass(self, cls, obj):
+		initFunc = cls.__dict__.get("initOverlayClass")
+		if initFunc:
+			initFunc(obj)
+
+	def findOverlayClassesForObject(self, obj, clsList):
+		if "findOverlayClasses" in vars(type(obj)):
+			obj.findOverlayClasses(clsList)
+		else:
+			clsList.append(type(obj))
+
+	def mutateObject(self, obj, clsList):
+		# Determine the bases for the new class.
+		bases=[]
+		for index in range(len(clsList)):
+			# A class doesn't need to be a base if it is already implicitly included by being a superclass of a previous base.
+			if index==0 or not issubclass(clsList[index-1],clsList[index]):
+				bases.append(clsList[index])
+		newCls = self.getDynamicClass(bases)
+		oldMro = frozenset(obj.__class__.__mro__)	
+		# Mutate obj into the new class.
+		obj.__class__ = newCls
+		# Apply logic to the new classes in the mro.
+		for cls in reversed(newCls.__mro__):
+			if cls in oldMro:
+				# This class was part of the initially constructed object,
+				# so its constructor would have been called.
+				continue
+			self.initNewSubclass(cls, obj)
+
+	def __call__(self, *args, **kwargs):
+		# Instantiate an object
+		obj = self.__new__(self, *args, **kwargs)
+		obj.__init__(*args, **kwargs)
+
+		clsList = []
+		self.findOverlayClassesForObject(obj, clsList)
+		self.mutateObject(obj, clsList)
+
+		return obj
+
+	@classmethod
+	def clearDynamicClassCache(cls):
+		"""Clear the dynamic class cache.
+		This should be called when a plugin is unloaded so that any used overlay classes in the unloaded plugin can be garbage collected.
+		"""
+		cls._dynamicClassCache.clear()
+
+
+class DynamicObject(AutoPropertyObject, metaclass=DynamicType):
+
+	def findOverlayClasses(self, clsList):
+		"""Chooses overlay classes which should be added to this object's class structure after the object has been initially instantiated.
+		After a class, such as an NVDAObject class (normally an API-level class) is instantiated,
+		this method is called on the instance to choose appropriate overlay classes.
+		This method may use properties, etc. on the instance to make this choice.
+		The object's class structure is then mutated to contain these classes.
+		L{initOverlayClass} is then called for each class which was not part of the initially instantiated object.
+		This process allows an object to be dynamically created.
+		Classes should be listed with subclasses first. That is, subclasses should generally call super and then append their own classes to the list.
+		For example: Called on an IAccessible NVDAObjectThe list might contain
+		DialogIaccessible (a subclass of IAccessible), Edit (a subclass of Window).
+		@param clsList: The list of classes, which will be modified by this method if appropriate.
+		@type clsList: list of L{DynamicObject}
+		"""
+		clsList.append(DynamicObject)
+
+
+class DynamicScriptableType(DynamicType, ScriptableType):
+	...
+
+
+class DynamicScriptableObject(DynamicObject, ScriptableObject, metaclass=DynamicScriptableType):
+	...

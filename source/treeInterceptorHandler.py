@@ -71,7 +71,7 @@ def terminate():
 	for ti in list(runningTable):
 		killTreeInterceptor(ti)
 
-class TreeInterceptor(baseObject.ScriptableObject):
+class TreeInterceptor(baseObject.DynamicScriptableObject):
 	"""Intercepts events and scripts for a tree of NVDAObjects.
 	When an NVDAObject is encompassed by this interceptor (i.e. it is beneath the root object or it is the root object itself),
 	events will first be executed on this interceptor if implemented.

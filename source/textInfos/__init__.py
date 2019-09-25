@@ -214,7 +214,7 @@ unitLabels={
 	UNIT_PARAGRAPH:_("paragraph"),
 }
 
-class TextInfo(baseObject.AutoPropertyObject):
+class TextInfo(baseObject.DynamicObject):
 	"""Provides information about a range of text in an object and facilitates access to all text in the widget.
 	A TextInfo represents a specific range of text, providing access to the text itself, as well as information about the text such as its formatting and any associated controls.
 	This range can be moved within the object's text relative to the initial position.
