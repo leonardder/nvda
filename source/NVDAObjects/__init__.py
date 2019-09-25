@@ -60,7 +60,69 @@ class InvalidNVDAObject(RuntimeError):
 	"""
 
 class DynamicNVDAObjectType(baseObject.ScriptableObject.__class__):
-	_dynamicClassCache={}
+	_dynamicClassCache = {}
+
+	@classmethod
+	def getDynamicClass(cls, bases):
+		# Construct the new class.
+		if len(bases) == 1:
+			# We only have one base, so there's no point in creating a dynamic type.
+			newCls=bases[0]
+		else:
+			bases=tuple(bases)
+			newCls = cls._dynamicClassCache.get(bases, None)
+			if not newCls:
+				name = "Dynamic_{name}".format(
+					name="".join(x.__name__ for x in bases)
+				)
+				newCls = type(name, bases, {"__module__": __name__})
+				cls._dynamicClassCache[bases]=newCls
+		return newCls
+
+	def initNewSubclass(self, cls, obj):
+		initFunc = cls.__dict__.get("initOverlayClass")
+		if initFunc:
+			initFunc(obj)
+		# Bind gestures specified on the class.
+		try:
+			obj.bindGestures(getattr(cls, "_%s__gestures" % cls.__name__))
+		except AttributeError:
+			pass
+
+	def findOverlayClassesForObject(self, obj, clsList):
+		if hasattr(obj, "findOverlayClasses"):
+			obj.findOverlayClasses(clsList)
+		else:
+			clsList.append(APIClass)
+		# Allow app modules to choose overlay classes.
+		# optimisation: The base implementation of chooseNVDAObjectOverlayClasses does nothing,
+		# so only call this method if it's been overridden.
+		if obj.appModule and not hasattr(obj.appModule.chooseNVDAObjectOverlayClasses, "_isBase"):
+			obj.appModule.chooseNVDAObjectOverlayClasses(obj, clsList)
+		# Allow global plugins to choose overlay classes.
+		for plugin in globalPluginHandler.runningPlugins:
+			if "chooseNVDAObjectOverlayClasses" in plugin.__class__.__dict__:
+				plugin.chooseNVDAObjectOverlayClasses(obj, clsList)
+
+
+	def mutateObject(self, obj, clsList):
+		# Determine the bases for the new class.
+		bases=[]
+		for index in range(len(clsList)):
+			# A class doesn't need to be a base if it is already implicitly included by being a superclass of a previous base.
+			if index==0 or not issubclass(clsList[index-1],clsList[index]):
+				bases.append(clsList[index])
+		newCls = self.getDynamicClass(bases)
+		oldMro = frozenset(obj.__class__.__mro__)	
+		# Mutate obj into the new class.
+		obj.__class__ = newCls
+		# Apply logic to the new classes in the mro.
+		for cls in reversed(newCls.__mro__):
+			if cls in oldMro:
+				# This class was part of the initially constructed object,
+				# so its constructor would have been called.
+				continue
+			self.initNewSubclass(cls, obj)
 
 	def __call__(self,chooseBestAPI=True,**kwargs):
 		if chooseBestAPI:
@@ -80,61 +142,12 @@ class DynamicNVDAObjectType(baseObject.ScriptableObject.__class__):
 			return None
 
 		clsList = []
-		if "findOverlayClasses" in APIClass.__dict__:
-			obj.findOverlayClasses(clsList)
-		else:
-			clsList.append(APIClass)
-		# Allow app modules to choose overlay classes.
-		appModule=obj.appModule
-		# optimisation: The base implementation of chooseNVDAObjectOverlayClasses does nothing,
-		# so only call this method if it's been overridden.
-		if appModule and not hasattr(appModule.chooseNVDAObjectOverlayClasses, "_isBase"):
-			appModule.chooseNVDAObjectOverlayClasses(obj, clsList)
-		# Allow global plugins to choose overlay classes.
-		for plugin in globalPluginHandler.runningPlugins:
-			if "chooseNVDAObjectOverlayClasses" in plugin.__class__.__dict__:
-				plugin.chooseNVDAObjectOverlayClasses(obj, clsList)
-
-		# Determine the bases for the new class.
-		bases=[]
-		for index in range(len(clsList)):
-			# A class doesn't need to be a base if it is already implicitly included by being a superclass of a previous base.
-			if index==0 or not issubclass(clsList[index-1],clsList[index]):
-				bases.append(clsList[index])
-
-		# Construct the new class.
-		if len(bases) == 1:
-			# We only have one base, so there's no point in creating a dynamic type.
-			newCls=bases[0]
-		else:
-			bases=tuple(bases)
-			newCls=self._dynamicClassCache.get(bases,None)
-			if not newCls:
-				name="Dynamic_%s"%"".join([x.__name__ for x in clsList])
-				newCls=type(name,bases,{"__module__": __name__})
-				self._dynamicClassCache[bases]=newCls
-
-		oldMro=frozenset(obj.__class__.__mro__)
-		# Mutate obj into the new class.
-		obj.__class__=newCls
-
-		# Initialise the overlay classes.
-		for cls in reversed(newCls.__mro__):
-			if cls in oldMro:
-				# This class was part of the initially constructed object, so its constructor would have been called.
-				continue
-			initFunc=cls.__dict__.get("initOverlayClass")
-			if initFunc:
-				initFunc(obj)
-			# Bind gestures specified on the class.
-			try:
-				obj.bindGestures(getattr(cls, "_%s__gestures" % cls.__name__))
-			except AttributeError:
-				pass
+		self.findOverlayClassesForObject(obj, clsList)
+		self.mutateObject(obj, clsList)
 
 		# Allow app modules to make minor tweaks to the instance.
-		if appModule and hasattr(appModule,"event_NVDAObject_init"):
-			appModule.event_NVDAObject_init(obj)
+		if obj.appModule and hasattr(obj.appModule, "event_NVDAObject_init"):
+			obj.appModule.event_NVDAObject_init(obj)
 
 		return obj
 
