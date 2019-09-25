@@ -695,18 +695,16 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 
 	def getTextWithFields(self,formatConfig=None):
 		log.debug("Start of getTextWithFields")
-		if self.isCollapsed:
-			log.debug("getTextWithFields: collapsed, returning empty list")
-			return []
 		if self.obj.ignoreFormatting:
 			return [self.text]
+		startOffset = self._rangeObj.start
+		endOffset = self._rangeObj.end
+		if startOffset == endOffset:
+			return []
 		extraDetail=formatConfig.get('extraDetail',False) if formatConfig else False
 		if not formatConfig:
 			formatConfig=config.conf['documentFormatting']
 		formatConfig['autoLanguageSwitching']=config.conf['speech'].get('autoLanguageSwitching',False)
-		startOffset=self._rangeObj.start
-		endOffset=self._rangeObj.end
-		text=BSTR()
 		# #9067: format config flags map is a dictionary.
 		formatConfigFlags=sum(y for x,y in formatConfigFlagsMap.items() if formatConfig.get(x,False))
 		if self.shouldIncludeLayoutTables:
@@ -715,6 +713,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			formatConfigFlags&=~formatConfigFlagsMap['reportRevisions']
 		if self.obj.ignorePageNumbers:
 			formatConfigFlags&=~formatConfigFlagsMap['reportPage']
+		text = BSTR()
 		log.debug(
 			"getTextWithFields: "
 			f"start={startOffset}, "
@@ -946,7 +945,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 
 	def _get_isCollapsed(self):
 		log.debug("isCollapsed")
-		res = self._rangeObj.Start == self._rangeObj.End:
+		res = self._rangeObj.Start == self._rangeObj.End
 		log.debug(f"End of isCollapsed: result={res}")
 		return res
 
