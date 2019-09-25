@@ -1,8 +1,7 @@
-#appModules/winword.py
-#A part of NonVisual Desktop Access (NVDA)
-#Copyright (C) 2006-2017 NV Access Limited, Manish Agrawal, Derek Riemer, Babbage B.V.
-#This file is covered by the GNU General Public License.
-#See the file COPYING for more details.
+# A part of NonVisual Desktop Access (NVDA)
+# Copyright (C) 2006-2019 NV Access Limited, Manish Agrawal, Derek Riemer, Babbage B.V.
+# This file is covered by the GNU General Public License.
+# See the file COPYING for more details.
 
 import ctypes
 import time
@@ -688,19 +687,19 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			# copying from one textInfo to another
 			self._rangeObj=position._rangeObj.duplicate
 		else:
-			raise NotImplementedError("position: %s"%position)
+			raise NotImplementedError(f"position: {position}")
 
 	def getTextWithFields(self,formatConfig=None):
-		if self.isCollapsed: return []
 		if self.obj.ignoreFormatting:
 			return [self.text]
+		startOffset = self._rangeObj.start
+		endOffset = self._rangeObj.end
+		if startOffset == endOffset:
+			return []
 		extraDetail=formatConfig.get('extraDetail',False) if formatConfig else False
 		if not formatConfig:
 			formatConfig=config.conf['documentFormatting']
 		formatConfig['autoLanguageSwitching']=config.conf['speech'].get('autoLanguageSwitching',False)
-		startOffset=self._rangeObj.start
-		endOffset=self._rangeObj.end
-		text=BSTR()
 		# #9067: format config flags map is a dictionary.
 		formatConfigFlags=sum(y for x,y in formatConfigFlagsMap.items() if formatConfig.get(x,False))
 		if self.shouldIncludeLayoutTables:
@@ -709,7 +708,15 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			formatConfigFlags&=~formatConfigFlagsMap['reportRevisions']
 		if self.obj.ignorePageNumbers:
 			formatConfigFlags&=~formatConfigFlagsMap['reportPage']
-		res=NVDAHelper.localLib.nvdaInProcUtils_winword_getTextInRange(self.obj.appModule.helperLocalBindingHandle,self.obj.documentWindowHandle,startOffset,endOffset,formatConfigFlags,ctypes.byref(text))
+		text = BSTR()
+		res = NVDAHelper.localLib.nvdaInProcUtils_winword_getTextInRange(
+			self.obj.appModule.helperLocalBindingHandle,
+			self.obj.documentWindowHandle,
+			startOffset,
+			endOffset,
+			formatConfigFlags,
+			ctypes.byref(text)
+		)
 		if res or not text:
 			log.debugWarning("winword_getTextInRange failed with %d"%res)
 			return [self.text]
@@ -722,7 +729,7 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 				elif isinstance(field,textInfos.FormatField):
 					item.field=self._normalizeFormatField(field,extraDetail=extraDetail)
 			elif index>0 and isinstance(item,str) and item.isspace():
-				 #2047: don't expose language for whitespace as its incorrect for east-asian languages 
+				#2047: don't expose language for whitespace as its incorrect for east-asian languages 
 				lastItem=commandList[index-1]
 				if isinstance(lastItem,textInfos.FieldCommand) and isinstance(lastItem.field,textInfos.FormatField):
 					try:
@@ -919,10 +926,8 @@ class WordDocumentTextInfo(textInfos.TextInfo):
 			raise ValueError("bad argument - which: %s"%which)
 
 	def _get_isCollapsed(self):
-		if self._rangeObj.Start==self._rangeObj.End:
-			return True
-		else:
-			return False
+		return self._rangeObj.Start == self._rangeObj.End
+
 
 	def collapse(self,end=False):
 		if end:
