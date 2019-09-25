@@ -156,7 +156,15 @@ WB_MOVEWORDRIGHT=5
 WB_LEFTBREAK=6
 WB_RIGHTBREAK=7
 
+class Fluf:
+	pass
+
 class EditTextInfo(textInfos.offsets.OffsetsTextInfo):
+
+	def findOverlayClasses(self, clsList):
+		clsList.append(Fluf)
+		clsList.append(EditTextInfo)
+
 
 	def _getPointFromOffset(self,offset):
 		if self.obj.editAPIVersion==1 or self.obj.editAPIVersion>=3:
