@@ -1631,6 +1631,7 @@ class BrailleHandler(baseObject.AutoPropertyObject):
 				kwargs["port"] = port
 
 		try:
+			# Todo: this doesn't support overlays yet.
 			newDisplay = _getDisplayDriver(name)
 			if detected and bdDetect._isDebug():
 				log.debug("Possibly detected display '%s'" % newDisplay.description)
