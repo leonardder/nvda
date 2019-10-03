@@ -738,6 +738,9 @@ def enterJavaWindow_helper(hwnd):
 def isJavaWindow(hwnd):
 	if not bridgeDll or not isRunning:
 		return False
+	# #10296: A restart of NVDA requires a restart of the JAVA app for the access bridge to function.
+	if winUser.getClassName(hwnd) == "SunAwtFrame":
+		return True
 	return bridgeDll.isJavaWindow(hwnd)
 
 def initialize():
