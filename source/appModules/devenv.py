@@ -1,38 +1,7 @@
-#appModules/devenv.py
-#A part of NonVisual Desktop Access (NVDA)
-#This file is covered by the GNU General Public License.
-#See the file COPYING for more details.
-#Copyright (C) 2010 Soronel Haetir <soronel.haetir@gmail.com>
-#
-# Suggestions from James Teh <jamie@nvaccess.org> have been used.
-#
-# Visual Studio 2005/2008 support for NVDA.
-#	I believe this code should work for VS2002/2003 as well but have no way of testing that.
-# I have confirmed this script requires at least Visual Studio Standard, as the Express editions
-#	don't register themselves with the running object table.
-# I have tried several means of getting around this, so far without success.
-#
-# I started with revision 3493 of the main NVDA branch for this work.
-#
-# !!! IMPORTANT !!!
-#
-# I had to modify many of the members of IVsTextManager and IVsTextView to cut down on dependencies.
-# Specifically any interface pointers other than IVsTextView have been changed to IUnknown
-# Also, many structure and enumerations have been replaced with c_int.
-# 
-# If NVDA becomes more dependant on the Visual Studio SDK interfaces the embedded wrappers
-# should be dropped in favor of the type library.
-#
-# !!! END OF IMPORTANT INFORMATION !!!
-#
-# The Visual Studio 2008 SDK is required if you wish
-#		to generate python type wrappers.  It can be downloaded at:
-#		http://www.microsoft.com/downloads/details.aspx?familyid=59EC6EC3-4273-48A3-BA25-DC925A45584D&displaylang=en
-# Use the MIDL compiler to build textmgr.tlb.
-# From \Program Files\Microsoft Visual Studio 2008 SDK\VisualStudioIntegration\Common\IDL:
-# midl /I ..\inc textmgr.idl
-# and then copy the resulting typelib to your sources\typelibs directory.
-#
+# A part of NonVisual Desktop Access (NVDA)
+# This file is covered by the GNU General Public License.
+# See the file COPYING for more details.
+# Copyright (C) 2010-2019 NV Access Limited, Soronel Haetir, Babbage B.V.
 
 import ctypes
 import objbase
@@ -40,7 +9,7 @@ from comtypes import IUnknown, IServiceProvider , GUID, COMMETHOD, HRESULT, BSTR
 from ctypes import POINTER, c_int, c_short, c_ushort, c_ulong
 import comtypes.client.dynamic
 from comtypes.automation import IDispatch
-
+from locationHelper import RectLTWH
 from logHandler import log
 import textInfos.offsets
 
@@ -49,17 +18,16 @@ from NVDAObjects.window import Window
 
 from NVDAObjects.window import DisplayModelEditableText
 from NVDAObjects.IAccessible import IAccessible
+from NVDAObjects.UIA import UIA
 
 import appModuleHandler
 import controlTypes
+import fnmatch
 
 
 #
 # A few helpful constants
 #
-
-VsRootWindowClassName="wndclass_desked_gsk"
-VsTextEditPaneClassName="VsTextEditPane"
 
 SVsTextManager = GUID('{F5E7E71D-1401-11D1-883B-0000F87579D2}')
 VsVersion_None = 0
@@ -89,27 +57,35 @@ SB_VERT = 1
 
 
 class AppModule(appModuleHandler.AppModule):
-	def chooseNVDAObjectOverlayClasses(self, obj, clsList):
-		vsMajor, vsMinor, rest = self.productVersion.split(".", 2)
-		vsMajor, vsMinor = int(vsMajor), int(vsMinor)
 
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		vsMajor, vsMinor, rest = self.productVersion.split(".", 2)
+		self.vsMajor, self.vsMinor = int(vsMajor), int(vsMinor)
+
+	def chooseNVDAObjectOverlayClasses(self, obj, clsList):
 		# Only use this overlay class if the top level automation object for the IDE can be retrieved,
 		# as it will not work otherwise.
-		if obj.windowClassName == VsTextEditPaneClassName and self._getDTE():
+		if self.DTE and (
+			obj.windowClassName == "VsTextEditPane" or (
+				isinstance(obj, UIA) and obj.UIAElement.CachedClassName == "WpfTextView"
+			)
+		):
 			try:
 				clsList.remove(DisplayModelEditableText)
 			except ValueError:
 				pass
 			clsList.insert(0, VsTextEditPane)
 
-		if ((vsMajor == 15 and vsMinor >= 3)
-			or vsMajor >= 16):
+		elif (
+			(self.vsMajor == 15 and self.vsMinor >= 3)
+			or self.vsMajor >= 16
+		):
 			if obj.role == controlTypes.ROLE_TREEVIEWITEM and obj.windowClassName == "LiteTreeView32":
 				clsList.insert(0, ObjectsTreeItem)
 
-
-	def _getDTE(self):
-	# Return the already fetched instance if there is one.
+	def _get_DTE(self):
+		# Return the already fetched instance if there is one.
 		try:
 			if self._DTE:
 				return self._DTE
@@ -117,143 +93,130 @@ class AppModule(appModuleHandler.AppModule):
 			pass
 
 		# Retrieve and cache the top level automation object for the IDE
-		DTEVersion = VsVersion_None
-		bctx = objbase.CreateBindCtx()
-		ROT = objbase.GetRunningObjectTable()
-		for mon in ROT:
-		# Test for the strings Visual Studio may have registered with.
-			displayName = mon.GetDisplayName(bctx, None)
-			if "!VisualStudio.DTE.9.0:%d"%self.processID==displayName:
-				DTEVersion=VsVersion_2008
-			elif "!VisualStudio.DTE.8.0:%d"%self.processID==displayName:
-				DTEVersion = VsVersion_2005
-			elif "!VisualStudio.DTE.7.1:%d"%self.processID==displayName:
-				DTEVersion = VsVersion_2003
-			elif "!VisualStudio.DTE:%d"%self.processID==displayName:
-				DTEVersion = VsVersion_2002
-
-			if DTEVersion != VsVersion_None:
-				self._DTEVersion = DTEVersion
-				self._DTE = comtypes.client.dynamic.Dispatch(ROT.GetObject(mon).QueryInterface(IDispatch))
-				break
-
-		else:
+		try:
+			self._DTE = comtypes.client.GetActiveObject(f"VisualStudio.DTE.{self.vsMajor}.0", dynamic=True)
+		except comtypes.COMError:
 			# None found.
-			log.debugWarning("No top level automation object found")
+			log.debugWarning("No top level automation object found", exc_info=True)
 			self._DTE = None
-			self._DTEVersion = VsVersion_None
-
-		# Loop has completed
 		return self._DTE
 
-	def _getTextManager(self):
+	def _get_textManager(self):
 		try:
 			if self._textManager:
 				return self._textManager
 		except AttributeError:
 			pass
-		serviceProvider = self._getDTE().QueryInterface(comtypes.IServiceProvider)
+
+		serviceProvider = self.DTE.QueryInterface(comtypes.IServiceProvider)
 		self._textManager = serviceProvider.QueryService(SVsTextManager, IVsTextManager)
 		return self._textManager
 
 class VsTextEditPaneTextInfo(textInfos.offsets.OffsetsTextInfo):
-	def _InformUnsupportedWindowType(self,type):
-		log.error("An unsupported window type `%d' was encountered, please inform the NVDA development team." %type)
-		raise NotImplementedError
-		
-	def _getSelectionObject(self):
-		Selection = None
-		if self._window.Type == VsWindowTypeDocument:
-			Selection = self._window.Selection
-		elif self._window.Type == VsWindowTypeOutput:
-			Selection = self._window.Object.ActivePane.TextDocument.Selection
-		elif self._window.Type==VsWindowTypeCommand:
-			Selection = self._window.Object.TextDocument.Selection
+
+	def _get__selectionObject(self):
+		selection = None
+		if self._window.Kind == "Document":
+			selection = self._window.Selection
 		else:
-			self._InformUnsupportedWindowType(self._window.Type)
-		return Selection
-	
+			selection = self._window.Object.ActivePane.TextDocument.Selection
+		self._selectionObject = selection 
+		return selection
+
 	def _createEditPoint(self):
-		return self._getSelectionObject().ActivePoint.CreateEditPoint()
-		
+		return self._selectionObject.ActivePoint.CreateEditPoint()
+
+	def _get_lineHeight(self):
+		self.lineHeight = self._textView.GetLineHeight()
+		return self.lineHeight
+
 	def _getOffsetFromPoint(self,x,y):
 		yMinUnit, yMaxUnit, yVisible, yFirstVisible = self._textView.GetScrollInfo(SB_VERT)
 		hMinUnit, hMaxUnit, hVisible, hFirstVisible = self._textView.GetScrollInfo(SB_HORZ)
 		# These should probably be cached as they are fairly unlikely to change, but ...
-		lineHeight = self._textView.GetLineHeight()
 		charWidth = self._window.Width // hVisible
 
-		offsetLine = (y - self._window.Top) // lineHeight + yFirstVisible
+		offsetLine = (y - self._window.Top) // self.lineHeight + yFirstVisible
 		offsetChar = (x - self._window.Left) // charWidth + hFirstVisible
 		return self._textView.GetNearestPosition(offsetLine, offsetChar)[0]
 
 	def __init__(self, obj, position):
 		self._window = obj._window
 		self._textView = obj._textView
-		super(VsTextEditPaneTextInfo, self).__init__(obj, position)
-	
+		super().__init__(obj, position)
+
 	def _getCaretOffset(self):
-		return self._createEditPoint().AbsoluteCharOffset
-		
-	def _setCaretOffset(self,offset):
-		self._getSelectionObject().MoveToAbsoluteOffset(offset)
-		
-	def _setSelectionOffsets(self,start,end):
-		Selection = self._getSelectionObject()
-		Selection.MoveToAbsoluteOffset(start)
-		Selection.MoveToAbsoluteOffset(end,True)
-		
+		return self._createEditPoint().AbsoluteCharOffset - 1
+
+	def _setCaretOffset(self, offset):
+		self._selectionObject.MoveToAbsoluteOffset(offset + 1)
+
+	def _setSelectionOffsets(self, start, end):
+		self._selectionObject.MoveToAbsoluteOffset(start + 1)
+		self._selectionObject.MoveToAbsoluteOffset(end + 1, True)
+
 	def _getSelectionOffsets(self):
-		selection = self._getSelectionObject()
-		startPos = selection.ActivePoint.CreateEditPoint().AbsoluteCharOffset - 1
-		endPos = selection.AnchorPoint.CreateEditPoint().AbsoluteCharOffset - 1
-		return (startPos,endPos)
-			
-	def _getTextRange(self,start,end):
+		startPos = self._selectionObject.ActivePoint.CreateEditPoint().AbsoluteCharOffset
+		endPos = self._selectionObject.AnchorPoint.CreateEditPoint().AbsoluteCharOffset
+		return (startPos -1, endPos -1)
+
+	def _getTextRange(self, start, end):
 		editPointStart = self._createEditPoint()
 		editPointStart.StartOfDocument()
-		if start:
-			editPointStart.MoveToAbsoluteOffset(start)
-		else:
-			start = 1
-		return editPointStart.GetText(end-start)
-		
-	def _getWordOffsets(self,startOffset):
+		if start > 0:
+			editPointStart.MoveToAbsoluteOffset(start + 1)
+		return editPointStart.GetText(end - start)
+
+	def _getCharacterOffsets(self, offset):
 		editPointStart = self._createEditPoint()
+		editPointStart.MoveToAbsoluteOffset(offset + 1)
+		editPointStart.CharLeft()
+		editPointEnd = editPointStart.CreateEditPoint()
+		editPointEnd.CharRight()
+		return (editPointStart.AbsoluteCharOffset -1, editPointEnd.AbsoluteCharOffset -1)
+
+	def _getWordOffsets(self, offset):
+		editPointStart = self._createEditPoint()
+		editPointStart.MoveToAbsoluteOffset(offset + 1)
+		editPointStart.WordLeft()
 		editPointEnd = editPointStart.CreateEditPoint()
 		editPointEnd.WordRight()
-		return editPointStart.AbsoluteCharOffset,editPointEnd.AbsoluteCharOffset
-		
-	def _getLineOffsets(self,offset):
+		return (editPointStart.AbsoluteCharOffset -1, editPointEnd.AbsoluteCharOffset -1)
+
+	def _getLineOffsets(self, offset):
 		editPointStart = self._createEditPoint()
-		editPointStart.MoveToAbsoluteOffset(offset)
+		editPointStart.MoveToAbsoluteOffset(offset + 1)
 		editPointStart.StartOfLine()
 		editPointEnd = editPointStart.CreateEditPoint()
 		editPointEnd.EndOfLine()
-		return (editPointStart.AbsoluteCharOffset,editPointEnd.AbsoluteCharOffset)
-	
-	def _getLineNumFromOffset(self,offset):
+		return (editPointStart.AbsoluteCharOffset -1, editPointEnd.AbsoluteCharOffset -1)
+
+	def _getLineNumFromOffset(self, offset):
 		editPoint = self._createEditPoint()
-		editPoint.MoveToAbsoluteOffset(offset)
+		editPoint.MoveToAbsoluteOffset(offset + 1)
 		return editPoint.Line
-	
+
 	def _getStoryLength(self):
 		editPoint = self._createEditPoint()
 		editPoint.EndOfDocument()
 		return editPoint.AbsoluteCharOffset
 
 
-class VsTextEditPane(EditableTextWithoutAutoSelectDetection,Window):
+class VsTextEditPane(EditableTextWithoutAutoSelectDetection, Window):
 	TextInfo = VsTextEditPaneTextInfo
 
 	def initOverlayClass(self):
-		self._window = self.appModule._getDTE().ActiveWindow
-		self.location = (self._window.Top,self._window.Left,self._window.Width,self._window.Height)
-		self._textView = self.appModule._getTextManager().GetActiveView(True, None)
+		self._window = self.appModule.DTE.ActiveWindow
+		self.location = RectLTWH(
+			self._window.Left,
+			self._window.Top,
+			self._window.Width,
+			self._window.Height
+		)
+		self._textView = self.appModule.textManager.GetActiveView(True, None)
 
 	def event_valueChange(self):
 		pass
-
 
 class IVsTextView(IUnknown):
 	_case_insensitive_ = True

@@ -125,7 +125,12 @@ class DynamicNVDAObjectType(baseObject.ScriptableObject.__class__):
 				continue
 			initFunc=cls.__dict__.get("initOverlayClass")
 			if initFunc:
-				initFunc(obj)
+				try:
+					initFunc(obj)
+				except Exception:
+					# This exception is caught without logging it.
+					log.exception()
+					raise
 			# Bind gestures specified on the class.
 			try:
 				obj.bindGestures(getattr(cls, "_%s__gestures" % cls.__name__))
