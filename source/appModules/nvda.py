@@ -10,7 +10,10 @@ import controlTypes
 import versionInfo
 from NVDAObjects.IAccessible import IAccessible
 import gui
+import speech
+import braille
 import config
+from logHandler import log
 
 nvdaMenuIaIdentity = None
 
@@ -28,7 +31,34 @@ class NvdaDialog(IAccessible):
 			return self.presType_content
 		return presType
 
+
+class NvdaDialogEmptyDescription(IAccessible):
+	"""Fix to ensure the NVDA settings dialog does not run getDialogText including panel descriptions
+		when alt+tabbing back to a focused control on a panel with a description. This would result in the
+		description being spoken twice.
+	"""
+
+	def _get_description(self):
+		"""Override the description property (because we can't override the classmethod getDialogText)
+			However this will do to ensure that the dialog is described as we wish.
+		"""
+		return ""
+
 class AppModule(appModuleHandler.AppModule):
+	# The configuration profile that has been previously edited.
+	# This ought to be a class property.
+	oldProfile = None
+
+	@classmethod
+	def handlePossibleProfileSwitch(cls):
+		from gui.settingsDialogs import NvdaSettingsDialogActiveConfigProfile as newProfile
+		if (cls.oldProfile and newProfile and newProfile != cls.oldProfile):
+			# Translators: A message announcing what configuration profile is currently being edited.
+			speech.speakMessage(_("Editing profile {profile}").format(profile=newProfile))
+		cls.oldProfile = newProfile
+
+	def event_appModule_loseFocus(self):
+		self.oldProfile = None
 
 	def isNvdaMenu(self, obj):
 		global nvdaMenuIaIdentity
@@ -58,11 +88,28 @@ class AppModule(appModuleHandler.AppModule):
 	# Silence invisible unknowns for stateChange as well.
 	event_stateChange = event_gainFocus
 
-	def event_foreground         (self, obj, nextHandler):
+	def event_foreground(self, obj, nextHandler):
 		if not gui.shouldConfigProfileTriggersBeSuspended():
 			config.conf.resumeProfileTriggers()
+		else:
+			self.handlePossibleProfileSwitch()
 		nextHandler()
+
+	def event_nameChange(self, obj, nextHandler):
+		self.handlePossibleProfileSwitch()
+		nextHandler()
+
+	def isNvdaSettingsDialog(self, obj):
+		if not isinstance(obj, IAccessible):
+			return False
+		windowHandle = obj.windowHandle
+		from gui.settingsDialogs import NvdaSettingsDialogWindowHandle
+		if windowHandle == NvdaSettingsDialogWindowHandle:
+			return True
+		return False
 
 	def chooseNVDAObjectOverlayClasses(self, obj, clsList):
 		if obj.windowClassName == "#32770" and obj.role == controlTypes.ROLE_DIALOG:
 			clsList.insert(0, NvdaDialog)
+			if self.isNvdaSettingsDialog(obj):
+				clsList.insert(0, NvdaDialogEmptyDescription)

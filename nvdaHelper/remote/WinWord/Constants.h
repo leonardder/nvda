@@ -44,6 +44,7 @@ constexpr int wdDISPID_FIELDS_ITEM_TYPE = 1;
 constexpr int wdDISPID_FONT_BOLD = 130;
 constexpr int wdDISPID_FONT_COLOR = 159;
 constexpr int wdDISPID_FONT_DOUBLESTRIKETHROUGH = 136;
+constexpr int wdDISPID_FONT_HIDDEN = 132;
 constexpr int wdDISPID_FONT_ITALIC = 131;
 constexpr int wdDISPID_FONT_NAME = 142;
 constexpr int wdDISPID_FONT_SIZE = 141;
@@ -121,8 +122,10 @@ constexpr int wdDISPID_RANGE_STORYTYPE = 7;
 constexpr int wdDISPID_RANGE_STYLE = 151;
 constexpr int wdDISPID_RANGE_TABLES = 50;
 constexpr int wdDISPID_RANGE_TEXT = 0;
+constexpr int wdDISPID_REVISION_RANGE = 3;
 constexpr int wdDISPID_REVISION_TYPE = 4;
 constexpr int wdDISPID_REVISIONS_ITEM = 0;
+constexpr int wdDISPID_REVISIONS_COUNT = 5;
 constexpr int wdDISPID_ROWS_COUNT = 2;
 constexpr int wdDISPID_SECTIONS_COUNT = 2;
 constexpr int wdDISPID_SECTIONS_ITEM = 0;
@@ -197,8 +200,16 @@ constexpr int wdLanguageUnknown = 9999999;
 constexpr int wdInlineShapeEmbeddedOLEObject = 1;
 constexpr int wdInlineShapePicture = 3;
 constexpr int wdInlineShapeLinkedPicture = 4;
+constexpr int wdInlineShapeChart = 12;
 
 // WdGutterStyle Enumeration
 constexpr int wdGutterPosLeft = 0;
 constexpr int wdGutterPosRight = 2;
 constexpr int wdGutterPosTop = 1;
+
+// chart constants
+constexpr int wdDISPID_INLINESHAPE_HASCHART = 148;
+constexpr int wdDISPID_INLINESHAPE_CHART = 149;
+constexpr int wdDISPID_CHART_CHARTTITLE = 1610743811;
+constexpr int wdDISPID_CHART_HASTITLE = 1610743809;
+constexpr int wdDISPID_CHARTTITLE_TEXT = 1610743820;
