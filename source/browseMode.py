@@ -14,14 +14,13 @@ import core
 from logHandler import log
 import documentBase
 import review
-import scriptHandler
 import eventHandler
 import nvwave
 import queueHandler
 import gui
 import ui
 import cursorManager
-from scriptHandler import isScriptWaiting, willSayAllResume
+import scriptHandler
 import aria
 import controlTypes
 import config
@@ -37,17 +36,17 @@ import gui.guiHelper
 from NVDAObjects import NVDAObject
 from abc import ABCMeta, abstractmethod
 from baseObject import AutoPropertyObject
-from enum import IntEnum
-
+from enum import Enum
+from typing import Optional
 
 REASON_QUICKNAV = "quickNav"
 
 
-class QuickNav(IntEnum):
+class QuickNav(str, Enum):
 	"""Enumeration for quick navigation layers."""
-	OFF = 0
-	CONTENT = 1
-	LAYOUT = 2
+	OFF = "off"
+	CONTENT = "content"
+	LAYOUT = "layout"
 
 
 quickNavLayerLabels = {
@@ -371,7 +370,7 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 
 	quickNavLayer = QuickNav.CONTENT
 
-	def getAlternativeScript(self,gesture,script):
+	def getQuickNavScript(self, gesture, script):
 		if self.passThrough or not gesture.isCharacter:
 			return script
 		if self.quickNavLayer == QuickNav.OFF:
@@ -380,11 +379,18 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 			script=self.script_trapNonCommandGesture
 		return script
 
+	@scriptHandler.script(
+		# Translators: the description for the cycleQuickNavLayers command in browse mode.
+		description=_(
+			"Toggles single letter navigation on and off. "
+			"When on, single letter keys in browse mode jump to various kinds of elements on the page. "
+			"When off, these keys are passed to the application"
+		),
+		gesture="kb:NVDA+shift+space"
+	)
 	def script_cycleQuickNavLayers(self,gesture):
 		self.quickNavLayer = (self.quickNavLayer + 1) % len(QuickNav)
 		ui.message(_("Single letter navigation %s") % quickNavLayerLabels[self.quickNavLayer])
-	# Translators: the description for the cycleQuickNavLayers command in browse mode.
-	script_cycleQuickNavLayers.__doc__=_("Toggles single letter navigation on and off. When on, single letter keys in browse mode jump to various kinds of elements on the page. When off, these keys are passed to the application")
 
 	def _get_ElementsListDialog(self):
 		return ElementsListDialog
@@ -421,16 +427,19 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 			ui.message(errorMessage)
 			return
 		item.moveTo()
-		if not gesture or not willSayAllResume(gesture):
+		if not gesture or not scriptHandler.willSayAllResume(gesture):
 			item.report(readUnit=readUnit)
 
 	@classmethod
 	def addQuickNav(
 		cls,
-		itemType, key,
-		nextDoc, nextError,
-		prevDoc, prevError,
-		readUnit=None,
+		itemType: str,
+		key: str,
+		nextDoc: str,
+		nextError: str,
+		prevDoc: str,
+		prevError: str,
+		readUnit: Optional[str] = None,
 		layer: QuickNav = QuickNav.CONTENT
 	):
 		"""Adds a script for the given quick nav item.
@@ -455,8 +464,8 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 		script = lambda self,gesture: self._quickNavScript(gesture, itemType, "next", nextError, readUnit)
 		script.__doc__ = nextDoc
 		script.__name__ = funcName
-		script.resumeSayAllMode=sayAllHandler.CURSOR_CARET
-		script._quickNavLayer=layer
+		script.resumeSayAllMode = sayAllHandler.CURSOR_CARET
+		script._quickNavLayer = layer
 		setattr(cls, funcName, script)
 		cls.__gestures["kb:%s" % key] = scriptName
 		scriptName = "previous%s" % scriptSuffix
@@ -556,7 +565,6 @@ class BrowseModeTreeInterceptor(treeInterceptorHandler.TreeInterceptor):
 		"kb:enter": "activatePosition",
 		"kb:numpadEnter": "activatePosition",
 		"kb:space": "activatePosition",
-		"kb:NVDA+shift+space":"cycleQuickNavLayers",
 		"kb:escape": "disablePassThrough",
 		"kb:control+enter": "passThrough",
 		"kb:control+numpadEnter": "passThrough",
@@ -1276,7 +1284,7 @@ class BrowseModeDocumentTreeInterceptor(documentBase.DocumentWithTableNavigation
 
 	def _set_selection(self, info, reason=controlTypes.REASON_CARET):
 		super(BrowseModeDocumentTreeInterceptor, self)._set_selection(info)
-		if isScriptWaiting() or not info.isCollapsed:
+		if scriptHandler.isScriptWaiting() or not info.isCollapsed:
 			return
 		# Save the last caret position for use in terminate().
 		# This must be done here because the buffer might be cleared just before terminate() is called,
@@ -1729,7 +1737,7 @@ class BrowseModeDocumentTreeInterceptor(documentBase.DocumentWithTableNavigation
 			return
 		container.collapse()
 		self._set_selection(container, reason=REASON_QUICKNAV)
-		if not willSayAllResume(gesture):
+		if not scriptHandler.willSayAllResume(gesture):
 			container.expand(textInfos.UNIT_LINE)
 			speech.speakTextInfo(container, reason=controlTypes.REASON_FOCUS)
 	script_moveToStartOfContainer.resumeSayAllMode=sayAllHandler.CURSOR_CARET
@@ -1754,7 +1762,7 @@ class BrowseModeDocumentTreeInterceptor(documentBase.DocumentWithTableNavigation
 			# Landing at the end of a browse mode document when trying to jump to the end of the current container. 
 			ui.message(_("Bottom"))
 		self._set_selection(container, reason=REASON_QUICKNAV)
-		if not willSayAllResume(gesture):
+		if not scriptHandler.willSayAllResume(gesture):
 			container.expand(textInfos.UNIT_LINE)
 			speech.speakTextInfo(container, reason=controlTypes.REASON_FOCUS)
 	script_movePastEndOfContainer.resumeSayAllMode=sayAllHandler.CURSOR_CARET
