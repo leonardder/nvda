@@ -37,3 +37,6 @@
 [submodule "include/py2exe"]
 	path = include/py2exe
 	url = https://github.com/nvaccess/py2exe-bin
+[submodule "include/detours"]
+	path = include/detours
+	url = https://github.com/microsoft/detours.git
