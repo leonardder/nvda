@@ -1,0 +1,25 @@
+Import([
+	'env',
+])
+
+detoursRootDir = env.Dir("#include/detours")
+detoursSourceDir = detoursRootDir.Dir("src")
+
+env=env.Clone()
+
+# Don't analyze the code as not our project
+if 'analyze' in env['nvdaHelperDebugFlags']:
+	env.Append(CCFLAGS='/analyze-')
+
+env.Prepend(CPPPATH=[".", detoursSourceDir])
+
+sourceFiles = [
+	"detours.cpp",
+]
+
+detoursLib=env.SharedLibrary(
+	target='detours',
+	source=sourceFiles,
+)
+
+Return('detoursLib')
