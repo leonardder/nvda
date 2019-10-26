@@ -1,9 +1,6 @@
 [submodule "include/liblouis"]
 	path = include/liblouis
 	url = https://github.com/liblouis/liblouis.git
-[submodule "include/minhook"]
-	path = include/minhook
-	url = https://github.com/RaMMicHaeL/minhook
 [submodule "miscDeps"]
 	path = miscDeps
 	url = https://github.com/nvaccess/nvda-misc-deps
