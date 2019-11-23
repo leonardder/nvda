@@ -10,6 +10,8 @@
 import weakref
 from logHandler import log
 from abc import ABCMeta, abstractproperty
+from typing import get_type_hints
+
 
 class Getter(object):
 
@@ -93,7 +95,15 @@ class AutoPropertyType(ABCMeta):
 				newAbstractProps.add(x)
 			elif x in self.__abstractmethods__:
 				oldAbstractProps.add(x)
-			setattr(self,x, attr)
+			if g:
+				annotatedFunc = g.__func__ if isinstance(g, classmethod) else g
+				returnAnnotation = get_type_hints(annotatedFunc).get("return")
+				if returnAnnotation:
+					annotations = getattr(self, "__annotations__", {})
+					if not annotations:
+						setattr(self, "__annotations__", annotations)
+					annotations[x] = returnAnnotation
+			setattr(self, x, attr)
 
 		if newAbstractProps or oldAbstractProps:
 			# The __abstractmethods__ set is frozen, therefore we ought to override it.
