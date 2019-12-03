@@ -165,7 +165,10 @@ def internal_keyDownEvent(vkCode,scanCode,extended,injected):
 			# Another key was pressed after the last NVDA modifier key, so it should not be passed through on the next press.
 			lastNVDAModifier = None
 		if gesture.isModifier:
-			if gesture.speechEffectWhenExecuted in (gesture.SPEECHEFFECT_PAUSE, gesture.SPEECHEFFECT_RESUME) and keyCode in currentModifiers:
+			if (
+				gesture.speechEffectWhenExecuted in (inputCore.SpeechEffect.PAUSE, inputCore.SpeechEffect.RESUME)
+				and keyCode in currentModifiers
+			):
 				# Ignore key repeats for the pause speech key to avoid speech stuttering as it continually pauses and resumes.
 				return True
 			currentModifiers.add(keyCode)
@@ -467,7 +470,7 @@ class KeyboardInputGesture(inputCore.InputGesture):
 
 	def _get_speechEffectWhenExecuted(self):
 		if inputCore.manager.isInputHelpActive:
-			return self.SPEECHEFFECT_CANCEL
+			return inputCore.SpeechEffect.CANCEL
 		if self.isExtended and winUser.VK_VOLUME_MUTE <= self.vkCode <= winUser.VK_VOLUME_UP:
 			return None
 		if self.vkCode == 0xFF:
@@ -480,8 +483,8 @@ class KeyboardInputGesture(inputCore.InputGesture):
 		if self.vkCode==winUser.VK_RETURN and not config.conf['keyboard']['speechInterruptForEnter']:
 			return None
 		if self.vkCode in (winUser.VK_SHIFT, winUser.VK_LSHIFT, winUser.VK_RSHIFT):
-			return self.SPEECHEFFECT_RESUME if speech.isPaused else self.SPEECHEFFECT_PAUSE
-		return self.SPEECHEFFECT_CANCEL
+			return inputCore.SpeechEffect.RESUME if speech.isPaused else inputCore.SpeechEffect.PAUSE
+		return inputCore.SpeechEffect.CANCEL
 
 	def reportExtra(self):
 		if self.vkCode in self.TOGGLE_KEYS:

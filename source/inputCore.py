@@ -32,6 +32,7 @@ import languageHandler
 import controlTypes
 import keyLabels
 import winKernel
+from enum import Enum
 
 #: Script category for emulated keyboard keys.
 # Translators: The name of a category of NVDA commands.
@@ -46,6 +47,17 @@ SCRCAT_BROWSEMODE = _("Browse mode")
 class NoInputGestureAction(LookupError):
 	"""Informs that there is no action to execute for a gesture.
 	"""
+
+
+class SpeechEffect(str, Enum):
+	"""The effect a gesture has on speech output."""
+	#: Speech will be cancelled.
+	CANCEL = "cancel"
+	#: Speech will be paused.
+	PAUSE = "pause"
+	#: Speech will be resumed when it was paused before.
+	RESUME = "resume"
+
 
 class InputGesture(baseObject.AutoPropertyObject):
 	"""A single gesture of input from the user.
@@ -123,11 +135,13 @@ class InputGesture(baseObject.AutoPropertyObject):
 	#: @type bool
 	isCharacter=False
 
-	SPEECHEFFECT_CANCEL = "cancel"
-	SPEECHEFFECT_PAUSE = "pause"
-	SPEECHEFFECT_RESUME = "resume"
-	#: The effect on speech when this gesture is executed; one of the SPEECHEFFECT_* constants or C{None}.
-	speechEffectWhenExecuted = SPEECHEFFECT_CANCEL
+	#: Deprecated SpeechEffect constants.
+	SPEECHEFFECT_CANCEL = SpeechEffect.CANCEL
+	SPEECHEFFECT_PAUSE = SpeechEffect.PAUSE
+	SPEECHEFFECT_RESUME = SpeechEffect.RESUME
+	#: The effect on speech when this gesture is executed.
+	#: @type: L{SpeechEffect}
+	speechEffectWhenExecuted = SpeechEffect.CANCEL
 
 	#: Whether this gesture is only a modifier, in which case it will not search for a script to execute.
 	#: @type: bool
@@ -438,10 +452,10 @@ class InputManager(baseObject.AutoPropertyObject):
 			gesture.wasInSayAll=True
 
 		speechEffect = gesture.speechEffectWhenExecuted
-		if speechEffect == gesture.SPEECHEFFECT_CANCEL:
+		if speechEffect == SpeechEffect.CANCEL:
 			queueHandler.queueFunction(queueHandler.eventQueue, speech.cancelSpeech)
-		elif speechEffect in (gesture.SPEECHEFFECT_PAUSE, gesture.SPEECHEFFECT_RESUME):
-			queueHandler.queueFunction(queueHandler.eventQueue, speech.pauseSpeech, speechEffect == gesture.SPEECHEFFECT_PAUSE)
+		elif speechEffect in (SpeechEffect.PAUSE, SpeechEffect.RESUME):
+			queueHandler.queueFunction(queueHandler.eventQueue, speech.pauseSpeech, speechEffect == SpeechEffect.PAUSE)
 
 		if gesture.shouldPreventSystemIdle:
 			winKernel.SetThreadExecutionState(winKernel.ES_SYSTEM_REQUIRED | winKernel.ES_DISPLAY_REQUIRED)
