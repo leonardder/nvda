@@ -97,8 +97,8 @@ def terminateRunningNVDA(window):
 
 def forceTerminateProcess(processID):
 	h = winKernel.openProcess(winKernel.PROCESS_TERMINATE | winKernel.SYNCHRONIZE, False, processID)
-	if not h:
-		raise OSError("Could not open process for termination")
+	if h == 0:
+		ctypes.WinError()
 	try:
 		winKernel.TerminateProcess(h, 1)
 		winKernel.waitForSingleObject(h, 2000)
