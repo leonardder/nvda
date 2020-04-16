@@ -59,11 +59,29 @@ def doInstall(
 	del progressDialog
 	if isinstance(res,installer.RetriableFailure):
 		# Translators: a message dialog asking to retry or cancel when NVDA install fails
-		message=_("The installation is unable to remove or overwrite a file. Another copy of NVDA may be running on another logged-on user account. Please make sure all installed copies of NVDA are shut down and try the installation again.")
+		message=_(
+			"The installation is unable to remove or overwrite a file. "
+			"Another copy of NVDA may be running on another logged-on user account.\n"
+			"Please make sure all installed copies of NVDA are shut down and try the installation again."\
+		)
 		# Translators: the title of a retry cancel dialog when NVDA installation fails
 		title=_("File in Use")
-		if winUser.MessageBox(None,message,title,winUser.MB_RETRYCANCEL)==winUser.IDRETRY:
-			return doInstall(createDesktopShortcut,startOnLogon,copyPortableConfig,isUpdate,silent,startAfterInstall)
+		with RetryCancelDialog(
+			gui.mainFrame,
+			title,
+			message,
+			terminateRunningProcesses=terminateRunningProcesses
+		) as dlg:
+			if dlg.ShowModal() == wx.OK:
+				return doInstall(
+					createDesktopShortcut,
+					startOnLogon,
+					copyPortableConfig,
+					isUpdate,
+					silent,
+					startAfterInstall,
+					dlg.terminateRunningProcessesCheckBox.Value
+				)
 	if res!=0:
 		log.error("Installation failed: %s"%res)
 		# Translators: The message displayed when an error occurs during installation of NVDA.
@@ -362,6 +380,49 @@ class PortableCreaterDialog(wx.Dialog):
 
 	def onCancel(self, evt):
 		self.Destroy()
+
+
+class RetryCancelDialog(gui.nvdaControls.MessageDialog):
+
+	terminateRunningProcessesCheckBox: wx.CheckBox
+
+	def __init__(
+			self,
+			parent,
+			title,
+			message,
+			dialogType=gui.nvdaControls.MessageDialog.DIALOG_TYPE_ERROR,
+			*,
+			terminateRunningProcesses
+	):
+		self.terminateRunningProcesses = terminateRunningProcesses
+		super().__init__(parent, title, message, dialogType)
+
+	def _addContents(self, contentsSizer):
+		self.terminateRunningProcessesCheckBox: wx.CheckBox = wx.CheckBox(
+			self,
+			# Translators: Checkbox allowing a user to forcefully terminate NVDA executables.
+			label=_("Forcefully terminate running NVDA instances (may cause data loss)")
+		)
+		self.terminateRunningProcessesCheckBox.Value = self.terminateRunningProcesses
+		contentsSizer.addItem(self.terminateRunningProcessesCheckBox)
+
+	def _addButtons(self, buttonHelper):
+		retryButton: wx.Button = buttonHelper.addButton(
+			self,
+			id=wx.ID_RETRY,
+			# Translators: A button in a dialog that retries an action.
+			label=_("&Retry")
+		)
+		retryButton.Bind(wx.EVT_BUTTON, lambda evt: self.EndModal(wx.OK))
+		cancelButton: wx.Button = buttonHelper.addButton(
+			self,
+			id=wx.ID_CANCEL,
+			# Translators: A button in a dialog that cancels an action.
+			label=_("&Cancel")
+		)
+		cancelButton.Bind(wx.EVT_BUTTON, lambda evt: self.EndModal(wx.CANCEL))
+
 
 def doCreatePortable(portableDirectory,copyUserConfig=False,silent=False,startAfterCreate=False):
 	d = gui.IndeterminateProgressDialog(gui.mainFrame,
