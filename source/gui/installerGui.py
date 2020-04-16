@@ -59,10 +59,10 @@ def doInstall(
 	del progressDialog
 	if isinstance(res,installer.RetriableFailure):
 		# Translators: a message dialog asking to retry or cancel when NVDA install fails
-		message=_(
+		message = _(
 			"The installation is unable to remove or overwrite a file. "
 			"Another copy of NVDA may be running on another logged-on user account.\n"
-			"Please make sure all installed copies of NVDA are shut down and try the installation again."\
+			"Please make sure all installed copies of NVDA are shut down and try the installation again."
 		)
 		# Translators: the title of a retry cancel dialog when NVDA installation fails
 		title=_("File in Use")
