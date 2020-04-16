@@ -5,11 +5,13 @@
 # For more details see: https://www.gnu.org/licenses/gpl-2.0.html
 
 """ System related functions."""
+
 import ctypes
 import winKernel
 import shellapi
 import winUser
 import os
+
 
 def openUserConfigurationDirectory():
 	"""Opens directory containing config files for the current user"""
@@ -72,3 +74,33 @@ def execElevated(path, params=None, wait=False, handleAlreadyElevated=False):
 			return winKernel.GetExitCodeProcess(sei.hProcess)
 		finally:
 			winKernel.closeHandle(sei.hProcess)
+
+
+def terminateRunningNVDA(window):
+	processID, threadID = winUser.getWindowThreadProcessID(window)
+	winUser.PostMessage(window, winUser.WM_QUIT, 0, 0)
+	h = winKernel.openProcess(winKernel.SYNCHRONIZE, False, processID)
+	if not h:
+		# The process is already dead.
+		return
+	try:
+		res = winKernel.waitForSingleObject(h, 4000)
+		if res == 0:
+			# The process terminated within the timeout period.
+			return
+	finally:
+		winKernel.closeHandle(h)
+
+	# The process is refusing to exit gracefully, so kill it forcefully.
+	forceTerminateNVDAProcess(processID)
+
+
+def forceTerminateNVDAProcess(processID):
+	h = winKernel.openProcess(winKernel.PROCESS_TERMINATE | winKernel.SYNCHRONIZE, False, processID)
+	if not h:
+		raise OSError("Could not open process for termination")
+	try:
+		winKernel.TerminateProcess(h, 1)
+		winKernel.waitForSingleObject(h, 2000)
+	finally:
+		winKernel.closeHandle(h)
