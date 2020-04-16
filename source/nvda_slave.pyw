@@ -46,7 +46,7 @@ def main():
 		if action=="install":
 			installer.install(
 				shouldCreateDesktopShortcut=bool(int(args[0])),
-				shouldRunAtLogon=bool(int(args[1]))
+				shouldRunAtLogon=bool(int(args[1])),
 				shouldTerminateRunningProcesses=bool(int(args[2]))
 			)
 		elif action=="unregisterInstall":
