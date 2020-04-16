@@ -78,9 +78,9 @@ def doInstall(
 					startOnLogon,
 					copyPortableConfig,
 					isUpdate,
-					silent,
-					startAfterInstall,
-					dlg.terminateRunningProcessesCheckBox.Value
+					silent=silent,
+					startAfterInstall=startAfterInstall,
+					terminateRunningProcesses=dlg.terminateRunningProcessesCheckBox.Value
 				)
 	if res!=0:
 		log.error("Installation failed: %s"%res)
@@ -114,6 +114,7 @@ def doInstall(
 	else:
 		wx.GetApp().ExitMainLoop()
 
+
 def doSilentInstall(startAfterInstall=True):
 	prevInstall=installer.comparePreviousInstall() is not None
 	startOnLogon=globalVars.appArgs.enableStartOnLogon
@@ -127,6 +128,7 @@ def doSilentInstall(startAfterInstall=True):
 		silent=True,
 		startAfterInstall=startAfterInstall
 	)
+
 
 class InstallerDialog(wx.Dialog, DpiScalingHelperMixin):
 
