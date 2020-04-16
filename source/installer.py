@@ -541,19 +541,8 @@ def tryCopyFile(sourceFilePath,destFilePath):
 			raise OSError("Unable to copy file %s to %s, error %d"%(sourceFilePath,destFilePath,errorCode))
 
 
-def install(
-		shouldCreateDesktopShortcut=True,
-		shouldRunAtLogon=True,
-		shouldTerminateRunningProcesses=False
-):
-	prevInstallPath = getInstallPath(noDefault=True)
-	try:
-		k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, config.NVDA_REGKEY)
-		configInLocalAppData = bool(winreg.QueryValueEx(k, config.CONFIG_IN_LOCAL_APPDATA_SUBKEY)[0])
-	except WindowsError:
-		configInLocalAppData = False
-	installDir=defaultInstallPath
-	startMenuFolder=defaultStartMenuFolder
+def removeMainExecutables(installDir, shouldTerminateRunningProcesses):
+	log.debug("Removing main executables, if any")
 	# Remove all the main executables always.
 	# We do this for two reasons:
 	# 1. If this fails, it means another copy of NVDA is running elsewhere,
@@ -563,19 +552,40 @@ def install(
 	for f in ("nvda.exe","nvda_noUIAccess.exe","nvda_UIAccess.exe","nvda_service.exe","nvda_slave.exe"):
 		f = os.path.join(installDir, f)
 		if os.path.isfile(f):
+			log.debug(f"File {f} exists")
 			try:
 				processIds = systemUtils.getRunningProcessInstances(f)
 			except COMError:
-				pass
+				log.error(f"Failed to get running process instances of {f}", exc_info=True)
 			else:
 				for processId in processIds:
 					if not shouldTerminateRunningProcesses:
 						raise RetriableFailure(f"File {f} is running as process with PID {processId}")
+					log.debug(f"Terminating {f}, process {processId}")
 					try:
 						systemUtils.forceTerminateProcess(processId)
 					except OSError:
-						pass   # If termination failed, tryRemoveFile fails below.
+						# If termination failed, tryRemoveFile fails below.
+						log.error(f"Couldn't terminate {f}, process {processId}", exc_info=True)
+			log.debug(f"Trying to remove {f}")
 			tryRemoveFile(f)
+
+
+def install(
+		shouldCreateDesktopShortcut=True,
+		shouldRunAtLogon=True,
+		shouldTerminateRunningProcesses=False
+):
+	prevInstallPath = getInstallPath(noDefault=True)
+	log.debug(f"Checking {config.CONFIG_IN_LOCAL_APPDATA_SUBKEY} in registry")
+	try:
+		k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, config.NVDA_REGKEY)
+		configInLocalAppData = bool(winreg.QueryValueEx(k, config.CONFIG_IN_LOCAL_APPDATA_SUBKEY)[0])
+	except WindowsError:
+		configInLocalAppData = False
+	installDir = defaultInstallPath
+	startMenuFolder = defaultStartMenuFolder
+	removeMainExecutables(installDir, shouldTerminateRunningProcesses)
 	unregisterInstallation(keepDesktopShortcut=shouldCreateDesktopShortcut)
 	if prevInstallPath:
 		removeOldLoggedFiles(prevInstallPath)
