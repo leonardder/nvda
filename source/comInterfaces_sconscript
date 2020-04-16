@@ -52,6 +52,7 @@ COM_INTERFACES = {
 	"SpeechLib.py": ('{C866CA3A-32F7-11D2-9602-00C04F8EE628}',5,0),
 	"AcrobatAccessLib.py": "typelibs/AcrobatAccess.tlb",
 	"FlashAccessibility.py": "typelibs/FlashAccessibility.tlb",
+	"WbemScripting.py": ('{565783C6-CB41-11D1-8B02-00600806D9B6}', 1, 2),
 }
 
 for k,v in COM_INTERFACES.items():

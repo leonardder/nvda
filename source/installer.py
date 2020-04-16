@@ -2,7 +2,7 @@
 # A part of NonVisual Desktop Access (NVDA)
 # This file is covered by the GNU General Public License.
 # See the file COPYING for more details.
-# Copyright (C) 2011-2019 NV Access Limited, Joseph Lee, Babbage B.V., Łukasz Golonka
+# Copyright (C) 2011-2020 NV Access Limited, Joseph Lee, Babbage B.V., Łukasz Golonka, Leonard de Ruijter
 
 from ctypes import *
 from ctypes.wintypes import *
@@ -23,6 +23,8 @@ import addonHandler
 import easeOfAccess
 import COMRegistrationFixes
 import winKernel
+import systemUtils
+from comtypes import COMError
 
 _wsh=None
 def _getWSH():
@@ -85,7 +87,7 @@ def comparePreviousInstall():
 	0 if it is the same, -1 if it is older,
 	None if there is no existing installation.
 	"""
-	path = getInstallPath(True)
+	path = getInstallPath(noDefault=True)
 	if not path or not os.path.isdir(path):
 		return None
 	try:
@@ -538,14 +540,18 @@ def tryCopyFile(sourceFilePath,destFilePath):
 			errorCode=GetLastError()
 			raise OSError("Unable to copy file %s to %s, error %d"%(sourceFilePath,destFilePath,errorCode))
 
-def install(shouldCreateDesktopShortcut=True,shouldRunAtLogon=True):
-	prevInstallPath=getInstallPath(noDefault=True)
+
+def install(
+		shouldCreateDesktopShortcut=True,
+		shouldRunAtLogon=True,
+		shouldTerminateRunningProcesses=False
+):
+	prevInstallPath = getInstallPath(noDefault=True)
 	try:
 		k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, config.NVDA_REGKEY)
 		configInLocalAppData = bool(winreg.QueryValueEx(k, config.CONFIG_IN_LOCAL_APPDATA_SUBKEY)[0])
 	except WindowsError:
 		configInLocalAppData = False
-	unregisterInstallation(keepDesktopShortcut=shouldCreateDesktopShortcut)
 	installDir=defaultInstallPath
 	startMenuFolder=defaultStartMenuFolder
 	# Remove all the main executables always.
@@ -555,9 +561,22 @@ def install(shouldCreateDesktopShortcut=True,shouldRunAtLogon=True):
 	# 2. The appropriate executable for nvda.exe will be determined by
 	# which executables exist after copying program files.
 	for f in ("nvda.exe","nvda_noUIAccess.exe","nvda_UIAccess.exe","nvda_service.exe","nvda_slave.exe"):
-		f=os.path.join(installDir,f)
+		f = os.path.join(installDir, f)
 		if os.path.isfile(f):
+			try:
+				processIds = systemUtils.getRunningProcessInstances(f)
+			except COMError:
+				pass
+			else:
+				for processId in processIds:
+					if not shouldTerminateRunningProcesses:
+						raise RetriableFailure(f"File {f} is running as process with PID {processId}")
+					try:
+						systemUtils.forceTerminateProcess(processId)
+					except OSError:
+						pass   # If termination failed, tryRemoveFile fails below.
 			tryRemoveFile(f)
+	unregisterInstallation(keepDesktopShortcut=shouldCreateDesktopShortcut)
 	if prevInstallPath:
 		removeOldLoggedFiles(prevInstallPath)
 	removeOldProgramFiles(installDir)
@@ -572,6 +591,7 @@ def install(shouldCreateDesktopShortcut=True,shouldRunAtLogon=True):
 	registerInstallation(installDir,startMenuFolder,shouldCreateDesktopShortcut,shouldRunAtLogon,configInLocalAppData)
 	removeOldLibFiles(installDir,rebootOK=True)
 	COMRegistrationFixes.fixCOMRegistrations()
+
 
 def removeOldLoggedFiles(installPath):
 	datPath=os.path.join(installPath,"uninstall.dat")
