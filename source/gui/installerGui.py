@@ -1,8 +1,7 @@
-#gui/installerGui.py
-#A part of NonVisual Desktop Access (NVDA)
-#This file is covered by the GNU General Public License.
-#See the file COPYING for more details.
-#Copyright (C) 2011-2018 NV Access Limited, Babbage B.v.
+# A part of NonVisual Desktop Access (NVDA)
+# This file is covered by the GNU General Public License.
+# See the file COPYING for more details.
+# Copyright (C) 2011-2020 NV Access Limited, Babbage B.v., Leonard de Ruijter
 
 import os
 import ctypes
@@ -22,7 +21,16 @@ from gui.dpiScalingHelper import DpiScalingHelperMixin
 import tones
 import systemUtils
 
-def doInstall(createDesktopShortcut,startOnLogon,copyPortableConfig,isUpdate,silent=False,startAfterInstall=True):
+
+def doInstall(
+		createDesktopShortcut,
+		startOnLogon,
+		copyPortableConfig,
+		isUpdate,
+		silent=False,
+		startAfterInstall=True,
+		terminateRunningProcesses=False
+):
 	progressDialog = gui.IndeterminateProgressDialog(gui.mainFrame,
 		# Translators: The title of the dialog presented while NVDA is being updated.
 		_("Updating NVDA") if isUpdate
@@ -35,7 +43,7 @@ def doInstall(createDesktopShortcut,startOnLogon,copyPortableConfig,isUpdate,sil
 	try:
 		res = systemUtils.execElevated(
 			config.SLAVE_FILENAME,
-			["install", str(int(createDesktopShortcut)), str(int(startOnLogon))],
+			["install", str(int(createDesktopShortcut)), str(int(startOnLogon)), str(int(terminateRunningProcesses))],
 			wait=True,
 			handleAlreadyElevated=True
 		)

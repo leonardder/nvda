@@ -92,10 +92,10 @@ def terminateRunningNVDA(window):
 		winKernel.closeHandle(h)
 
 	# The process is refusing to exit gracefully, so kill it forcefully.
-	forceTerminateNVDAProcess(processID)
+	forceTerminateProcess(processID)
 
 
-def forceTerminateNVDAProcess(processID):
+def forceTerminateProcess(processID):
 	h = winKernel.openProcess(winKernel.PROCESS_TERMINATE | winKernel.SYNCHRONIZE, False, processID)
 	if not h:
 		raise OSError("Could not open process for termination")
@@ -104,3 +104,20 @@ def forceTerminateNVDAProcess(processID):
 		winKernel.waitForSingleObject(h, 2000)
 	finally:
 		winKernel.closeHandle(h)
+
+
+def getRunningProcessInstances(name: str):
+	"""Retrieves Process Identifiers for running processes with the specified name, if any."""
+	import comtypes.client
+	wmi = comtypes.client.CoGetObject("winmgmts:")
+	# WMI requires paths with backslahses escaped
+	escapedName = name.replace("\\", r"\\")
+	processes = wmi.ExecQuery(f"SELECT ProcessId FROM Win32_Process WHERE ExecutablePath = '{escapedName}'")
+	# We need the number of processes to enumerate the result.
+	# If we somehow threw an invalid query at WMI, fetching the count will reveal that with a COMError,
+	# which should be caught by the caller
+	count = processes.Count
+	return tuple(
+		processes.ItemIndex(i).Properties_['ProcessId'].Value
+		for i in range(count)
+	)

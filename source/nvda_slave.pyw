@@ -44,7 +44,7 @@ def main():
 
 	try:
 		if action=="install":
-			installer.install(bool(int(args[0])),bool(int(args[1])))
+			installer.install(bool(int(args[0])), bool(int(args[1])), bool(int(args[2])))
 		elif action=="unregisterInstall":
 			import installer
 			installer.unregisterInstallation()
