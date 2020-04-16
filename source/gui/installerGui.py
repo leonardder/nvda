@@ -45,7 +45,7 @@ def doInstall(
 			config.SLAVE_FILENAME,
 			["install", str(int(createDesktopShortcut)), str(int(startOnLogon)), str(int(terminateRunningProcesses))],
 			wait=True,
-			handleAlreadyElevated=True
+			handleAlreadyElevated=False
 		)
 		if res==2: raise installer.RetriableFailure
 		if copyPortableConfig:
