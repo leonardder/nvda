@@ -99,6 +99,9 @@ def main():
 		else:
 			raise ValueError("No such action")
 
+	except installer.RunningNVDAInstancesFailure:
+		logHandler.log.error("Running NVDA instances, try again",exc_info=True)
+		sys.exit(3)
 	except installer.RetriableFailure:
 		logHandler.log.error("Task failed, try again",exc_info=True)
 		sys.exit(2)

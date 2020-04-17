@@ -2,7 +2,7 @@
 # A part of NonVisual Desktop Access (NVDA)
 # This file is covered by the GNU General Public License.
 # See the file COPYING for more details.
-# Copyright (C) 2011-2020 NV Access Limited, Joseph Lee, Babbage B.V., Łukasz Golonka, Leonard de Ruijter
+# Copyright (C) 2011-2019 NV Access Limited, Joseph Lee, Babbage B.V., Łukasz Golonka
 
 from ctypes import *
 from ctypes.wintypes import *
@@ -24,7 +24,6 @@ import easeOfAccess
 import COMRegistrationFixes
 import winKernel
 import systemUtils
-from comtypes import COMError
 
 _wsh=None
 def _getWSH():
@@ -87,7 +86,7 @@ def comparePreviousInstall():
 	0 if it is the same, -1 if it is older,
 	None if there is no existing installation.
 	"""
-	path = getInstallPath(noDefault=True)
+	path = getInstallPath(True)
 	if not path or not os.path.isdir(path):
 		return None
 	try:
@@ -482,8 +481,16 @@ def _deleteKeyAndSubkeys(key, subkey):
 		# Delete this key
 		winreg.DeleteKey(k, "")
 
+
 class RetriableFailure(Exception):
+	"""An exception during installation indicating that a possible retry may succeed."""
 	pass
+
+
+class RunningNVDAInstancesFailure(RetriableFailure):
+	"""A retryable failure indicating that there are running NVDA instances for other users on the system."""
+	pass
+
 
 def tryRemoveFile(path,numRetries=6,retryInterval=0.5,rebootOK=False):
 	dirPath=os.path.dirname(path)
@@ -540,52 +547,38 @@ def tryCopyFile(sourceFilePath,destFilePath):
 			errorCode=GetLastError()
 			raise OSError("Unable to copy file %s to %s, error %d"%(sourceFilePath,destFilePath,errorCode))
 
-
-def removeMainExecutables(installDir, shouldTerminateRunningProcesses):
-	log.debug("Removing main executables, if any")
+def install(shouldCreateDesktopShortcut=True,shouldRunAtLogon=True):
+	prevInstallPath=getInstallPath(noDefault=True)
+	try:
+		k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, config.NVDA_REGKEY)
+		configInLocalAppData = bool(winreg.QueryValueEx(k, config.CONFIG_IN_LOCAL_APPDATA_SUBKEY)[0])
+	except WindowsError:
+		configInLocalAppData = False
+	existingExecutableNames = [
+		file for file in (
+			os.path.join(installDir, f)
+			for f in
+			("nvda.exe","nvda_noUIAccess.exe","nvda_UIAccess.exe","nvda_service.exe","nvda_slave.exe")
+		) if 		if os.path.isfile(file):
+	]
+	installDir=defaultInstallPath
+	startMenuFolder=defaultStartMenuFolder
+	# Try whether any of the main executables are running,
+	try:
+		executablesRunning = areExecutablesRunning(existingExecutableNames)
+	except LookupError:
+		pass
+	else:
+		if executablesRunning:
+			raise RunningNVDAInstancesFailure("NVDA executables are still running and need to be closed")
 	# Remove all the main executables always.
 	# We do this for two reasons:
 	# 1. If this fails, it means another copy of NVDA is running elsewhere,
 	# so we shouldn't proceed.
 	# 2. The appropriate executable for nvda.exe will be determined by
 	# which executables exist after copying program files.
-	for f in ("nvda.exe","nvda_noUIAccess.exe","nvda_UIAccess.exe","nvda_service.exe","nvda_slave.exe"):
-		f = os.path.join(installDir, f)
-		if os.path.isfile(f):
-			log.debug(f"File {f} exists")
-			try:
-				processIds = systemUtils.getRunningProcessInstances(f)
-			except COMError:
-				log.error(f"Failed to get running process instances of {f}", exc_info=True)
-			else:
-				for processId in processIds:
-					if not shouldTerminateRunningProcesses:
-						raise RetriableFailure(f"File {f} is running as process with PID {processId}")
-					log.debug(f"Terminating {f}, process {processId}")
-					try:
-						systemUtils.forceTerminateProcess(processId)
-					except OSError:
-						# If termination failed, tryRemoveFile fails below.
-						log.error(f"Couldn't terminate {f}, process {processId}", exc_info=True)
-			log.debug(f"Trying to remove {f}")
-			tryRemoveFile(f)
-
-
-def install(
-		shouldCreateDesktopShortcut=True,
-		shouldRunAtLogon=True,
-		shouldTerminateRunningProcesses=False
-):
-	prevInstallPath = getInstallPath(noDefault=True)
-	log.debug(f"Checking {config.CONFIG_IN_LOCAL_APPDATA_SUBKEY} in registry")
-	try:
-		k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, config.NVDA_REGKEY)
-		configInLocalAppData = bool(winreg.QueryValueEx(k, config.CONFIG_IN_LOCAL_APPDATA_SUBKEY)[0])
-	except WindowsError:
-		configInLocalAppData = False
-	installDir = defaultInstallPath
-	startMenuFolder = defaultStartMenuFolder
-	removeMainExecutables(installDir, shouldTerminateRunningProcesses)
+	for f in existingExecutableNames:
+		tryRemoveFile(f)
 	unregisterInstallation(keepDesktopShortcut=shouldCreateDesktopShortcut)
 	if prevInstallPath:
 		removeOldLoggedFiles(prevInstallPath)
@@ -601,7 +594,6 @@ def install(
 	registerInstallation(installDir,startMenuFolder,shouldCreateDesktopShortcut,shouldRunAtLogon,configInLocalAppData)
 	removeOldLibFiles(installDir,rebootOK=True)
 	COMRegistrationFixes.fixCOMRegistrations()
-
 
 def removeOldLoggedFiles(installPath):
 	datPath=os.path.join(installPath,"uninstall.dat")
