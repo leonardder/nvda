@@ -56,13 +56,13 @@ def doInstall(createDesktopShortcut,startOnLogon,copyPortableConfig,isUpdate,sil
 		if isinstance(res, installer.RunningNVDAInstancesFailure):
 			# Translators: a message dialog asking to retry or cancel when NVDA install fails
 			# due to active instances of NVDA
-			message=_(
+			message = _(
 				"NVDA seems to be active on another logged-on user account. "
 				"Please make sure all installed copies of NVDA are shut down before retrying."
 			)
 		else:
 			# Translators: a message dialog asking to retry or cancel when NVDA install fails
-			message=_(
+			message = _(
 				"The installation is unable to remove or overwrite a file. "
 				"Another copy of NVDA may be running on another logged-on user account. "
 				"Please make sure all installed copies of NVDA are shut down and try the installation again. "
@@ -384,7 +384,7 @@ def doCreatePortable(portableDirectory,copyUserConfig=False,silent=False,startAf
 		d.done()
 		if isinstance(e,installer.RetriableFailure):
 			# Translators: a message dialog asking to retry or cancel when NVDA portable copy creation fails
-			message=_("NVDA is unable to remove or overwrite a file.")
+			message =_("NVDA is unable to remove or overwrite a file.")
 			# Translators: the title of a retry cancel dialog when NVDA portable copy creation  fails
 			title=_("File in Use")
 			if winUser.MessageBox(None,message,title,winUser.MB_RETRYCANCEL)==winUser.IDRETRY:

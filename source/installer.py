@@ -554,18 +554,18 @@ def install(shouldCreateDesktopShortcut=True,shouldRunAtLogon=True):
 		configInLocalAppData = bool(winreg.QueryValueEx(k, config.CONFIG_IN_LOCAL_APPDATA_SUBKEY)[0])
 	except WindowsError:
 		configInLocalAppData = False
+	installDir=defaultInstallPath
 	existingExecutableNames = [
 		file for file in (
 			os.path.join(installDir, f)
 			for f in
-			("nvda.exe","nvda_noUIAccess.exe","nvda_UIAccess.exe","nvda_service.exe","nvda_slave.exe")
-		) if 		if os.path.isfile(file):
+			("nvda.exe", "nvda_noUIAccess.exe", "nvda_UIAccess.exe", "nvda_service.exe", "nvda_slave.exe")
+		) if os.path.isfile(file)
 	]
-	installDir=defaultInstallPath
 	startMenuFolder=defaultStartMenuFolder
 	# Try whether any of the main executables are running,
 	try:
-		executablesRunning = areExecutablesRunning(existingExecutableNames)
+		executablesRunning = systemUtils.areExecutablesRunning(existingExecutableNames)
 	except LookupError:
 		pass
 	else:
@@ -613,7 +613,7 @@ def removeOldLoggedFiles(installPath):
 def createPortableCopy(destPath,shouldCopyUserConfig=True):
 	destPath=os.path.abspath(destPath)
 	#Remove all the main executables always
-	for f in ("nvda.exe","nvda_noUIAccess.exe","nvda_UIAccess.exe"):
+	for f in ("nvda.exe", "nvda_noUIAccess.exe", "nvda_UIAccess.exe"):
 		f=os.path.join(destPath,f)
 		if os.path.isfile(f):
 			tryRemoveFile(f)
