@@ -360,6 +360,24 @@ class GlobalCommands(ScriptableObject):
 	script_toggleReportFontAttributes.__doc__=_("Toggles on and off the reporting of font attributes")
 	script_toggleReportFontAttributes.category=SCRCAT_DOCUMENTFORMATTING
 
+	@script(
+		# Translators: Input help mode message for toggle superscripts and subscripts command.
+		description=_("Toggles on and off the reporting of superscripts and subscripts"),
+		category=SCRCAT_DOCUMENTFORMATTING,
+	)
+	def script_toggleReportSuperscriptsAndSubscripts(self, gesture):
+		shouldReport: bool = not config.conf["documentFormatting"]["reportSuperscriptsAndSubscripts"]
+		config.conf["documentFormatting"]["reportSuperscriptsAndSubscripts"] = shouldReport
+		if shouldReport:
+			# Translators: The message announced when toggling the report superscripts and subscripts
+			# document formatting setting.
+			state = _("report superscripts and subscripts on")
+		else:
+			# Translators: The message announced when toggling the report superscripts and subscripts
+			# document formatting setting.
+			state = _("report superscripts and subscripts off")
+		ui.message(state)
+	
 	def script_toggleReportRevisions(self,gesture):
 		if config.conf["documentFormatting"]["reportRevisions"]:
 			# Translators: The message announced when toggling the report revisions document formatting setting.
@@ -1371,17 +1389,34 @@ class GlobalCommands(ScriptableObject):
 	script_sayAll.category=SCRCAT_SYSTEMCARET
 
 	def _reportFormattingHelper(self, info, browseable=False):
-		formatConfig={
-			"detectFormatAfterCursor":False,
-			"reportFontName":True,"reportFontSize":True,"reportFontAttributes":True,"reportColor":True,"reportRevisions":False,"reportEmphasis":False,
-			"reportStyle":True,"reportAlignment":True,"reportSpellingErrors":True,
-			"reportPage":False,"reportLineNumber":False,"reportLineIndentation":True,"reportLineIndentationWithTones":False,"reportParagraphIndentation":True,"reportLineSpacing":True,"reportTables":False,
-			"reportLinks":False,"reportHeadings":False,"reportLists":False,
-			"reportBlockQuotes":False,"reportComments":False,
-			"reportBorderStyle":True,"reportBorderColor":True,
-		}
-		textList=[]
+		# Report all formatting-related changes regardless of user settings
+		# when explicitly requested.
+		# These are the options we want reported when reporting formatting manually.
+		# for full list of options that may be reported see the "documentFormatting" section of L{config.configSpec}
+		reportFormattingOptions = (
+			"reportFontName",
+			"reportFontSize",
+			"reportFontAttributes",
+			"reportSuperscriptsAndSubscripts",
+			"reportColor",
+			"reportStyle",
+			"reportAlignment",
+			"reportSpellingErrors",
+			"reportLineIndentation",
+			"reportParagraphIndentation",
+			"reportLineSpacing",
+			"reportBorderStyle",
+			"reportBorderColor",
+		)
 
+		# Create a dictionary to replace the config section that would normally be
+		# passed to getFormatFieldsSpeech / getFormatFieldsBraille
+		formatConfig = dict()
+		from config import conf
+		for i in conf["documentFormatting"]:
+			formatConfig[i] = i in reportFormattingOptions
+
+		textList = []
 		# First, fetch indentation.
 		line=info.copy()
 		line.expand(textInfos.UNIT_LINE)
@@ -1582,6 +1617,17 @@ class GlobalCommands(ScriptableObject):
 	# Translators: Input help mode message for developer info for current navigator object command, used by developers to examine technical info on navigator object. This command also serves as a shortcut to open NVDA log viewer.
 	script_navigatorObject_devInfo.__doc__ = _("Logs information about the current navigator object which is useful to developers and activates the log viewer so the information can be examined.")
 	script_navigatorObject_devInfo.category=SCRCAT_TOOLS
+
+	@script(
+		# Translators: Input help mode message for Open user configuration directory command.
+		description=_("Opens NVDA configuration directory for the current user."),
+		category=SCRCAT_TOOLS
+	)
+	def script_openUserConfigurationDirectory(self, gesture):
+		if globalVars.appArgs.secure:
+			return
+		import systemUtils
+		systemUtils.openUserConfigurationDirectory()
 
 	def script_toggleProgressBarOutput(self,gesture):
 		outputMode=config.conf["presentation"]["progressBarUpdates"]["progressBarOutputMode"]
@@ -1814,6 +1860,26 @@ class GlobalCommands(ScriptableObject):
 	# Translators: Input help mode message for go to input gestures dialog command.
 	script_activateInputGesturesDialog.__doc__ = _("Shows the NVDA input gestures dialog")
 	script_activateInputGesturesDialog.category=SCRCAT_CONFIG
+
+	@script(
+		# Translators: Input help mode message for the report current configuration profile command.
+		description=_("Reports the name of the current NVDA configuration profile"),
+		category=SCRCAT_CONFIG,
+	)
+	def script_reportActiveConfigurationProfile(self, gesture):
+		activeProfileName = config.conf.profiles[-1].name
+
+		if not activeProfileName:
+			# Translators: Message announced when the command to report the current configuration profile and
+			# the default configuration profile is active.
+			activeProfileMessage = _("normal configuration profile active")
+		else:
+			# Translators: Message announced when the command to report the current configuration profile
+			# is active. The placeholder '{profilename}' is replaced with the name of the current active profile.
+			activeProfileMessage = _("{profileName} configuration profile active").format(
+				profileName=activeProfileName
+			)
+		ui.message(activeProfileMessage)
 
 	def script_saveConfiguration(self,gesture):
 		wx.CallAfter(gui.mainFrame.onSaveConfigurationCommand, None)
@@ -2288,6 +2354,37 @@ class GlobalCommands(ScriptableObject):
 				obj.doAction()
 	script_touch_hoverUp.category=SCRCAT_TOUCH
 
+	def script_touch_rightClick(self, gesture):
+		obj = api.getNavigatorObject()
+		# Ignore invisible or offscreen objects as they cannot even be navigated with touch gestures.
+		if controlTypes.STATE_INVISIBLE in obj.states or controlTypes.STATE_OFFSCREEN in obj.states:
+			return
+		try:
+			p = api.getReviewPosition().pointAtStart
+		except (NotImplementedError, LookupError):
+			p = None
+		if p:
+			x = p.x
+			y = p.y
+		else:
+			try:
+				(left, top, width, height) = obj.location
+			# Flake8/E722: stems from object location script.
+			except: # noqa
+				# Translators: Reported when the object has no location for the mouse to move to it.
+				ui.message(_("object has no location"))
+				return
+			# Don't bother clicking when parts or the entire object is offscreen.
+			if min(left, top, width, height) < 0:
+				return
+			x = left + (width // 2)
+			y = top + (height // 2)
+		winUser.setCursorPos(x, y)
+		self.script_rightMouseClick(gesture)
+	# Translators: Input help mode message for touch right click command.
+	script_touch_rightClick.__doc__ = _("Clicks the right mouse button at the current touch position. This is generally used to activate a context menu.") # noqa Flake8/E501
+	script_touch_rightClick.category = SCRCAT_TOUCH
+
 	def script_activateConfigProfilesDialog(self, gesture):
 		wx.CallAfter(gui.mainFrame.onConfigProfilesCommand, None)
 	# Translators: Describes the command to open the Configuration Profiles dialog.
@@ -2459,10 +2556,13 @@ class GlobalCommands(ScriptableObject):
 					enableMessage = _("Temporary Screen curtain, enabled until next restart")
 
 				try:
-					vision.handler.initializeProvider(
-						screenCurtainProviderInfo,
-						temporary=tempEnable,
-					)
+					if alreadyRunning:
+						screenCurtainProviderInfo.providerClass.enableInConfig(True)
+					else:
+						vision.handler.initializeProvider(
+							screenCurtainProviderInfo,
+							temporary=tempEnable,
+						)
 				except Exception:
 					log.error("Screen curtain initialization error", exc_info=True)
 					# Translators: Reported when the screen curtain could not be enabled.
@@ -2556,6 +2656,8 @@ class GlobalCommands(ScriptableObject):
 		"ts:3finger_tap":"touch_changeMode",
 		"ts:2finger_double_tap":"showGui",
 		"ts:hoverUp":"touch_hoverUp",
+		"ts:tapAndHold": "touch_rightClick", # noqa (Flake8/ET121)
+
 		# Review cursor
 		"kb:shift+numpad7": "review_top",
 		"kb(laptop):NVDA+control+home": "review_top",
@@ -2791,4 +2893,3 @@ class ConfigProfileActivationCommands(ScriptableObject):
 #: The single instance for the configuration profile activation commands.
 #: @type: L{ConfigProfileActivationCommands}
 configProfileActivationCommands = ConfigProfileActivationCommands()
-

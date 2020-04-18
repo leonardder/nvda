@@ -3,12 +3,60 @@ Qué hay de Nuevo en NVDA
 
 %!includeconf: ../changes.t2tconf
 
-= 2019.3 =
+= 2020.1 =
+Lo reseñable de esta versión incluye la admisión de varias nuevas pantallas braille de HumanWare y de APH, más muchas otras importantes correcciones de fallos tales como la capacidad de leer de nuevo matemáticas en Microsoft Word utilizando MathPlayer y MathType.
 
 == Nuevas Características ==
-- En el indicativo de órdenes, en PowerShell y en el subsistema de  Windows para Linux en Windows 10 versión de octubre de 2018 y posterior:
- - Rendimiento y estabilidad enormemente mejorados (#9771)
- - El anunciado del texto escrito que no aparezca en pantalla  (tal como contraseñas) ahora puede activarse a través de una opción en el panel de opciones avanzadas de NVDA. (#9649)
+- El elemento actualmente seleccionado en cuadros de lista se presenta nuevamente en modo exploración en Chrome, similar a NVDA 2019.1. (#10713)
+- Ahora puedes realizar clics con el botón derecho del ratón en dispositivos táctiles haciendo un tap con un dedo y manteniéndolo. (#3886)
+- Soporte para pantallas braille nuevas: APH Chameleon 20, APH Mantis Q40, HumanWare BrailleOne, BrailleNote Touch v2, y NLS eReader. (#10830)
+
+
+== Cambios ==
+- NVDA evitará que el sistema se bloquee o se suspenda cuando esté leyendo todo. (#10643)
+- Soporte para iframes fuera de proceso en Mozilla Firefox. (#10707)
+- Actualizado el transcriptor braille liblouis a la versión 3.12. (#10161)
+
+
+== Corrección de Fallos ==
+- Corregido el no anunciado del símbolo menos Unicode (U+2212) (#10633)
+- Al instalar complementos desde el administrador de complementos los nombres de los ficheros y carpetas en la ventana de exploración ya no se anuncian dos veces. (#10620, #2395)
+- En Firefox, al cargar Mastodon con la interface de web avanzada habilitada, ahora todas las cronologías se procesan correctamente en modo exploración. (#10776)
+- En modo exploración, NVDA ahora anuncia "no marcado" para casillas de verificación no marcadas donde no lo hacía en ocasiones anteriormente. (#10781)
+- Los controles ARIA switch ya no anuncian información confusa tal como "no pulsado marcado" o "pulsado marcado". (#9187)
+- Las voces SAPI4 ya no deberían rechazar verbalizar cierto texto. (#10792)
+- NVDA puede leer e interactuar de nuevo con ecuaciones matemáticas en Microsoft Word. (#10803)
+- NVDA anunciará de nuevo el texto que se deselecione en modo exploración si se pulsa una flecha mientras el texto se selecciona. (#10731).
+- NVDA ya no sale si hay un error inicializando eSpeak. (#10607)
+- Los errores causados por unicode en traducciones para atajos ya no detienen el instalador, mitigados por la vuelta al texto en inglés. (#5166, #6326)
+- El hecho de salir  de las listas y tablas en Leer todo con la lectura superficial habilitada ya no anuncia continuamente la salida de la lista o tabla. (#10706)
+
+
+== Cambios para Desarrolladores ==
+- Ahora se compila la documentación para el desarrollador usando sphinx. (#9840)
+- Se han dividido en dos varias funciones del habla. (#10593)
+ La versión speakX permanece, pero ahora depende de una función getXSpeech la cual devuelve una secuencia de voz.
+  - speakObjectProperties ahora se basa en getObjectPropertiesSpeech
+  - speakObject ahora se basa en getObjectSpeech
+  - speakTextInfo ahora se basa en getTextInfoSpeech
+  - speakWithoutPauses se ha convertido en una clase, y se ha refactorizado, pero no debería romper la retrocompatibilidad.
+  - getSpeechForSpelling está obsoleta (aunque todavía disponible) utiliza getSpellingSpeech en su lugar.
+  Cambios privados que no deberían afectar a los desarrolladores de complementos:
+  - _speakPlaceholderIfEmpty ahora es _getPlaceholderSpeechIfTextEmpty
+  - _speakTextInfo_addMath ahora es _extendSpeechSequence_addMathForTextInfo
+- Speech 'reason' se ha convertido a un Enum, Consulta la clase controlTypes.OutputReason. (#10703)
+  - Las constantes Module level 'REASON_*' están obsoletas.
+- Las dependencias de compilación de NVDA ahora requieren Visual Studio 2019 (16.2 o más reciente). (#10169)
+- Actualizado SCons a la versión 3.1.1. (#10169)
+- De nuevo se permite a behaviors._FakeTableCell no tener una localización definida (#10864)
+
+
+= 2019.3 =
+NVDA 2019.3 es una versión muy significativa que contiene muchos cambios bajo el capó, incluyendo la actualización de Python 2 a Python 3, y una importante reescritura del sistema de habla de NVDA.
+Aunque estos cambios rompan la compatibilidad con los antiguos complemenhtos de NVDA, la actualización a Python 3 es necesaria por motivos de seguridad, y los cambios en el habla permiten algunas innovaciones interesantes en un futuro próximo.
+Otros aspectos destacados en esta versión incluyen el soporte para 64 bits para Java VMs, las funcionalidades Cortina de Pantalla y Resaltado del Foco, admisión de más pantallas braille y un nuevo visor braille, y muchas otras correcciones de fallos.
+
+== Nuevas Características ==
 - La precisión de la orden mover el ratón al navegador de objetos se ha mejorado en campos de texto en aplicaciones Java. (#10157)
 - Añadido el soporte para las siguientes pantallas braille Handy Tech (#8955):
  - Basic Braille Plus 40
@@ -27,6 +75,7 @@ Qué hay de Nuevo en NVDA
 - Añadida la funcionalidad Resaltado de pantalla a NVDA. (#971, #9064)
  - El resaltado del foco, del navegador de objetos y de la posición del cursor del modo Exploración pueden habilitarse y configurarse a través de la categoría 'visión' en el diálogo Opciones de NVDA.
  - Nota: esta característica es incompatible con el complemento focus highlight, sin embargo, el complemento todavía puede utilizarse mientras el resaltador incorporado esté deshabilitado.
+- Añadida la herramienta Visualizador de Braille, que permite ver la salida braille a través de una ventana sobre la pantalla. (#7788)
 
 
 == Cambios ==
@@ -44,6 +93,7 @@ Qué hay de Nuevo en NVDA
 - Al enfocar un grupo en el modo Exploración, ahora también se lee la descripción. (#10095)
 - Ahora se incluye el Java Access Bridge con NVDA para permitir el acceso a aplicaciones Java, incluso para máquinas Java de 64 bits. (#7724)
 - Si el Java Access Bridge no está habilitado para el usuario, NVDA lo habilita actomáticamente al arrancar. (#7952)
+- Actualizado eSpeak-NG a 1.51-dev, commit ca65812ac6019926f2fbd7f12c92d7edd3701e0c. (#10581)
 
 
 == Corrección de fallos ==
@@ -73,6 +123,11 @@ Qué hay de Nuevo en NVDA
 - Las aplicaciones Java iniciadas antes de NVDA ahora son accesibles sin la necesidad de iniciar la aplicación Java. (#10296)
 - En Mozilla Firefox, cuando el elemento enfocado se marca como actual (aria-current), este cambio ya no se verbaliza varias veces. (#8960)
 - NVDA ahora tratará a ciertos caracteres de composición unicode tales como e-acute como un solo carácter al moverse por el texto. (#10550)
+- Ahora se admite Spring Tool Suite Versión 4. (#10001)
+- No se pronuncia el nombre por duplicado cuando aria-labelledby relation target es un elemento interior. (#10552)
+- En Windows 10 version 1607 y posterior, los caracteres escritos desde teclados Braille se verbalizan en más situaciones. (#10569)
+- Al cambiar el dispositivo de salida de audio, los tonos reproducidos por NVDA ahora se reproducirán por el dispositivo recientemente seleccionado. (#2167)
+- En Mozilla Firefox, mover el foco en modo Exploración es más rápido. Esto hace que mover el cursor en modo Exploración sea más ágil en muchos casos. (#10584)
 
 
 == Cambios para Desarrolladores ==
