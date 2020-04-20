@@ -4,6 +4,7 @@
 # This file is covered by the GNU General Public License.
 # See the file COPYING for more details.
 
+from queue import Queue
 from ctypes import *
 from ctypes.wintypes import *
 import comtypes.client
@@ -192,8 +193,8 @@ class UIAHandler(COMObject):
 	def __init__(self):
 		super(UIAHandler,self).__init__()
 		self.MTAThreadInitEvent=threading.Event()
-		self.MTAThreadStopEvent=threading.Event()
 		self.MTAThreadInitException=None
+		self.MTAThreadQueue=Queue()
 		self.MTAThread = threading.Thread(
 			name=f"{self.__class__.__module__}.{self.__class__.__qualname__}.MTAThread",
 			target=self.MTAThreadFunc
@@ -206,7 +207,7 @@ class UIAHandler(COMObject):
 
 	def terminate(self):
 		MTAThreadHandle=HANDLE(windll.kernel32.OpenThread(winKernel.SYNCHRONIZE,False,self.MTAThread.ident))
-		self.MTAThreadStopEvent.set()
+		self.MTAThreadQueue.put_nowait(None)
 		#Wait for the MTA thread to die (while still message pumping)
 		if windll.user32.MsgWaitForMultipleObjects(1,byref(MTAThreadHandle),False,200,0)!=0:
 			log.debugWarning("Timeout or error while waiting for UIAHandler MTA thread")
@@ -275,9 +276,11 @@ class UIAHandler(COMObject):
 			self.rootElement=self.clientObject.getRootElementBuildCache(self.baseCacheRequest)
 			self.reservedNotSupportedValue=self.clientObject.ReservedNotSupportedValue
 			self.ReservedMixedAttributeValue=self.clientObject.ReservedMixedAttributeValue
+			self.pendingForegroundUIAElement=None
+			self.currentForegroundUIAElement=None
 			self.clientObject.AddFocusChangedEventHandler(self.baseCacheRequest,self)
 			# Use a list of keys as AddPropertyChangedEventHandler expects a sequence.
-			self.clientObject.AddPropertyChangedEventHandler(self.rootElement,TreeScope_Subtree,self.baseCacheRequest,self,list(UIAPropertyIdsToNVDAEventNames))
+			#self.clientObject.AddPropertyChangedEventHandler(self.rootElement,TreeScope_Subtree,self.baseCacheRequest,self,list(UIAPropertyIdsToNVDAEventNames))
 			for x in UIAEventIdsToNVDAEventNames.keys():
 				self.clientObject.addAutomationEventHandler(x,self.rootElement,TreeScope_Subtree,self.baseCacheRequest,self)
 			# #7984: add support for notification event (IUIAutomation5, part of Windows 10 build 16299 and later).
@@ -287,8 +290,44 @@ class UIAHandler(COMObject):
 			self.MTAThreadInitException=e
 		finally:
 			self.MTAThreadInitEvent.set()
-		self.MTAThreadStopEvent.wait()
+		while True:
+			func=self.MTAThreadQueue.get()
+			if func:
+				try:
+					func()
+				except:
+					log.error("Exception in function queued to UIA MTA thread",exc_info=True)
+			else:
+				break
 		self.clientObject.RemoveAllEventHandlers()
+
+	def _onForegroundChange(self):
+		pendingForegroundUIAElement=self.pendingForegroundUIAElement
+		if pendingForegroundUIAElement==self.currentForegroundUIAElement:
+			return
+		if self.currentForegroundUIAElement:
+			try:
+				self.clientObject.removePropertyChangedEventHandler(self.currentForegroundUIAElement,self)
+			except COMError:
+				# The old UIAElement died as the window was closed.
+				# The system should forget the old event registration itself.
+				pass
+		try:
+			self.clientObject.AddPropertyChangedEventHandler(pendingForegroundUIAElement,TreeScope_Subtree,self.baseCacheRequest,self,UIAPropertyIdsToNVDAEventNames.keys())
+		except COMError:
+			log.error("Could not register for UIA property change events for new foreground")
+			self.currentForegroundUIAElement=None
+		else:
+			self.currentForegroundUIAElement=pendingForegroundUIAElement
+
+	def onForegroundChange(self,hwnd):
+		try:
+			self.pendingForegroundUIAElement=self.clientObject.ElementFromHandle(hwnd)
+		except COMError:
+			log.debugWarning("Could not get a UIAElement from new foreground window")
+			return
+		# Event registration/unregistration must be always done from the MTA thread, otherwise deadlocks can occur with our UI.
+		self.MTAThreadQueue.put_nowait(self._onForegroundChange)
 
 	def IUIAutomationEventHandler_HandleAutomationEvent(self,sender,eventID):
 		if not self.MTAThreadInitEvent.isSet():
