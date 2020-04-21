@@ -101,3 +101,10 @@ htmlNodeNameToAriaRoles: Dict[str, str] = {
 	"dialog": "dialog",
 	"figure": "figure",
 }
+
+
+class AriaLive(str, Enum):
+	OFF = "off"
+	POLITE = "polite"
+	ASSERTIVE = "assertive"
+
