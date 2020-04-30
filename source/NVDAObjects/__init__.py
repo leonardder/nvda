@@ -1356,3 +1356,9 @@ This code is executed if a gain focus event is received by this object.
 		For performance, this method will only count up to the given maxCount number, and if there is one more above that, then sys.maxint is returned stating that many items are selected.
 		"""
 		return 0
+
+	def matchAPIEvent(self, params):
+		"""Determine whether a raw platform API event matches this object.
+		The parameters are specific to the API and are supplied by the API handler.
+		"""
+		return False

@@ -226,7 +226,18 @@ def handleAppTerminate(appModule):
 		return
 	_acceptEvents -= events
 
-def shouldAcceptEvent(eventName, windowHandle=None):
+
+def _getNVDAObjectsToWatch():
+	"""Return NVDAObjects for which most events should be processed.
+	"""
+	return (
+		*api.getFocusAncestors(),
+		api.getFocusObject(),
+		api.getNavigatorObject(),
+		api.getDesktopObject()
+	)
+
+def shouldAcceptEvent(eventName, windowHandle=None, apiEventParams=None):
 	"""Check whether an event should be accepted from a platform API.
 	Creating NVDAObjects and executing events can be expensive
 	and might block the main thread noticeably if the object is slow to respond.
@@ -267,6 +278,20 @@ def shouldAcceptEvent(eventName, windowHandle=None):
 	if windowHandle == winUser.getDesktopWindow():
 		# #5595: Events for the cursor get mapped to the desktop window.
 		return True
+
+	if apiEventParams and eventName not in (
+		"gainFocus", "foreground",
+		"menuStart", "alert",
+		# We need valueChange events for progress bars.
+		"valueChange"
+	):
+		# We only care about most events if they are for specific objects the user
+		# is interested in.
+		for obj in _getNVDAObjectsToWatch():
+			if obj.matchAPIEvent(apiEventParams):
+				break
+		else:
+			return False
 
 	# #6713: Edge (and soon all UWP apps) will no longer have windows as descendants of the foreground window.
 	# However, it does look like they are always  equal to or descendants of the "active" window of the input thread. 

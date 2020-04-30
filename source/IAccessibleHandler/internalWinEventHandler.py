@@ -13,6 +13,7 @@ from typing import Dict, Callable
 
 import core
 import winUser
+import eventHandler
 
 from comInterfaces.IAccessible2Lib import (
 	IA2_EVENT_TEXT_CARET_MOVED,
@@ -145,6 +146,23 @@ def winEventCallback(handle, eventID, window, objectID, childID, threadID, times
 			# HACK: Events get fired by this window in Windows Live Messenger 2009 when it starts. If we send a
 			# WM_NULL to this window at this point (which happens in accessibleObjectFromEvent), Messenger will
 			# silently exit (#677). Therefore, completely ignore these events, which is useless to us anyway.
+			return
+		if (
+			# #4001: We can't call shouldAcceptEvent for focus events here because
+			# it causes focus issues when starting applications.
+			eventID not in (
+				winUser.EVENT_OBJECT_FOCUS, winUser.EVENT_SYSTEM_FOREGROUND
+			) and
+			# Events for the caret get converted later.
+			objectID != winUser.OBJID_CARET and
+			not eventHandler.shouldAcceptEvent(
+				winEventIDsToNVDAEventNames[eventID],
+				windowHandle=window,
+				apiEventParams={
+					"windowHandle": window, "objectID": objectID, "childID": childID
+				}
+			)
+		):
 			return
 		if winEventLimiter.addEvent(eventID, window, objectID, childID, threadID):
 			core.requestPump()

@@ -1643,6 +1643,14 @@ the NVDAObject for IAccessible
 		except COMError:
 			return False
 
+	def matchAPIEvent(self, params):
+		return (
+			params.get("windowHandle") == self.windowHandle and
+			params.get("objectID") == self.event_objectID and
+			params.get("childID") == self.event_childID
+		)
+
+
 class ContentGenericClient(IAccessible):
 
 	TextInfo=displayModel.DisplayModelTextInfo
