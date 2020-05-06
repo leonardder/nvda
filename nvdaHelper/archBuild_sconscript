@@ -21,6 +21,7 @@ Import(
 	'sourceTypelibDir',
 	'libInstallDir',
 	'clientInstallDir',
+	'isHostEnv',
 )
 
 # some utilities for COM proxies
@@ -159,7 +160,7 @@ Export('env')
 
 acrobatAccessRPCStubs=env.SConscript('acrobatAccess_sconscript')
 Export('acrobatAccessRPCStubs')
-if TARGET_ARCH=='x86':
+if isHostEnv:
 	env.Install(sourceTypelibDir,acrobatAccessRPCStubs[0]) #typelib
 
 ia2RPCStubs=env.SConscript('ia2_sconscript')
@@ -167,21 +168,21 @@ Export('ia2RPCStubs')
 if signExec:
 	env.AddPostAction(ia2RPCStubs[0],[signExec])
 env.Install(libInstallDir,ia2RPCStubs[0]) #proxy dll
-if TARGET_ARCH=='x86':
+if isHostEnv:
 	env.Install(sourceTypelibDir,ia2RPCStubs[1]) #typelib
 
 iSimpleDomRPCStubs=env.SConscript('ISimpleDOM_sconscript')
 if signExec:
 	env.AddPostAction(iSimpleDomRPCStubs[0],[signExec])
 env.Install(libInstallDir,iSimpleDomRPCStubs[0]) #proxy dll
-if TARGET_ARCH=='x86':
+if isHostEnv:
 	env.Install(sourceTypelibDir,iSimpleDomRPCStubs[1]) #typelib
 
 mathPlayerRPCStubs=env.SConscript('mathPlayer_sconscript')
-if TARGET_ARCH=='x86':
+if isHostEnv:
 	env.Install(sourceTypelibDir,mathPlayerRPCStubs[0]) #typelib
 
-if TARGET_ARCH=='x86':
+if isHostEnv:
 	localLib=env.SConscript('local/sconscript')
 	Export('localLib')
 	if signExec:
@@ -211,12 +212,12 @@ if signExec:
 	env.AddPostAction(remoteLib[0],[signExec])
 env.Install(libInstallDir,remoteLib)
 
-if TARGET_ARCH in ('x86_64', 'arm64'):
+if not isHostEnv:
 	remoteLoaderProgram=env.SConscript('remoteLoader/sconscript')
 	if signExec:
 		env.AddPostAction(remoteLoaderProgram,[signExec])
 	env.Install(libInstallDir,remoteLoaderProgram)
 
-if TARGET_ARCH=='x86':
+if isHostEnv:
 	env.SConscript('espeak/sconscript')
 	env.SConscript('liblouis/sconscript')

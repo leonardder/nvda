@@ -10,6 +10,7 @@ dist
 *.manifest
 source/synthDrivers/espeak-ng-data
 source/lib
+source/lib32
 source/lib64
 source/typelibs
 source/louis
