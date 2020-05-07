@@ -12,6 +12,7 @@ import versionInfo
 import winKernel
 import config
 
+import ctypes
 from ctypes import *
 from ctypes.wintypes import *
 from comtypes import BSTR
@@ -505,9 +506,14 @@ def initialize():
 		log.info("Remote injection disabled due to running as a Windows Store Application")
 		return
 	#Load nvdaHelperRemote.dll but with an altered search path so it can pick up other dlls in lib
-	h=windll.kernel32.LoadLibraryExW(os.path.abspath(os.path.join(versionedLibPath,u"nvdaHelperRemote.dll")),0,0x8)
-	if not h:
-		log.critical("Error loading nvdaHelperRemote.dll: %s" % WinError())
+	try:
+		h = winKernel.LoadLibraryEx(
+			os.path.abspath(os.path.join(versionedLibPath, "nvdaHelperRemote.dll")),
+			0,
+			winKernel.LOAD_WITH_ALTERED_SEARCH_PATH
+		)
+	except OSError:
+		log.critical("Error loading nvdaHelperRemote.dll", exc_info=True)
 		return
 	_remoteLib=CDLL("nvdaHelperRemote",handle=h)
 	if _remoteLib.injection_initialize(globalVars.appArgs.secure) == 0:

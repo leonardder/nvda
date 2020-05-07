@@ -12,6 +12,7 @@ import ctypes.wintypes
 from ctypes import WinError
 from ctypes import *
 from ctypes.wintypes import *
+from typing import Optional
 
 kernel32=ctypes.windll.kernel32
 advapi32 = windll.advapi32
@@ -412,4 +413,19 @@ def SetThreadExecutionState(esFlags):
 	res = kernel32.SetThreadExecutionState(esFlags)
 	if not res:
 		raise WinError()
+	return res
+
+
+kernel32.LoadLibraryExW.restype = ctypes.wintypes.HMODULE 
+LOAD_WITH_ALTERED_SEARCH_PATH = 0x8
+
+
+def LoadLibraryEx(
+		libFileName: str,
+		file: int,
+		flags: int
+) -> Optional[int]:
+	res = kernel32.LoadLibraryExW(libFileName, ctypes.wintypes.HANDLE(file), flags)
+	if not res:
+		raise ctypes.WinError()
 	return res
