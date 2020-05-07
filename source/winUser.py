@@ -445,14 +445,24 @@ def isDescendantWindow(parentHwnd,childHwnd):
 	else:
 		return False
 
+
+user32.GetForegroundWindow.restype = ctypes.wintypes.HWND
+
+
 def getForegroundWindow():
 	return user32.GetForegroundWindow()
+
+
 
 def setForegroundWindow(hwnd):
 	user32.SetForegroundWindow(hwnd)
 
 def setFocus(hwnd):
 	user32.SetFocus(hwnd)
+
+
+user32.GetDesktopWindow.restype = ctypes.wintypes.HWND
+
 
 def getDesktopWindow():
 	return user32.GetDesktopWindow()
@@ -481,7 +491,7 @@ def sendMessage(hwnd,msg,param1,param2):
 	return user32.SendMessageW(hwnd,msg,param1,param2)
 
 def getWindowThreadProcessID(hwnd):
-	processID=c_int()
+	processID = DWORD()
 	threadID=user32.GetWindowThreadProcessId(hwnd,byref(processID))
 	return (processID.value,threadID)
 
