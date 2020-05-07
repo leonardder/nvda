@@ -358,7 +358,8 @@ def NVDADistGenerator(target, source, env, for_signature):
 	# Therefore , copy required libraries from Windows 10 SDK.
 	try:
 		with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\Microsoft\Microsoft SDKs\Windows\v10.0', 0,winreg.KEY_READ|winreg.KEY_WOW64_32KEY) as SDKKey:
-			CRTDir = os.path.join(winreg.QueryValueEx(SDKKey, 'InstallationFolder')[0], "Redist", "ucrt", "DLLs", "x86")
+			sdkArch = "x86" if _archVars.mainHelperArchitecture == "x86" else "x64"
+			CRTDir = os.path.join(winreg.QueryValueEx(SDKKey, 'InstallationFolder')[0], "Redist", "ucrt", "DLLs", sdkArch)
 	except WindowsError:
 		raise RuntimeError("Windows 10 SDK not found")
 	if os.path.isdir(CRTDir):

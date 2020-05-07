@@ -28,7 +28,7 @@ versionedMainLibPath = 'lib32' if _archVars.pythonArchitecture == "32bit" else '
 if os.environ.get('PROCESSOR_ARCHITEW6432') == 'ARM64':
 	versionedOtherLibPath = 'libArm64'
 else:
-	versionedOtherLibPath = 'lib64'
+	versionedOtherLibPath = 'lib64' if _archVars.pythonArchitecture == "32bit" else 'lib32'
 if getattr(sys,'frozen',None):
 	# Not running from source. Libraries are in a version-specific directory
 	versionedMainLibPath = os.path.join(versionedMainLibPath, versionInfo.version)
@@ -505,7 +505,8 @@ def initialize():
 		log.info("Remote injection disabled due to running as a Windows Store Application")
 		return
 	#Load nvdaHelperRemote.dll but with an altered search path so it can pick up other dlls in lib
-	h=windll.kernel32.LoadLibraryExW(os.path.abspath(os.path.join(versionedMainLibPath,u"nvdaHelperRemote.dll")),0,0x8)
+	windll.kernel32.LoadLibraryExW.restype = c_int64
+	h = windll.kernel32.LoadLibraryExW(os.path.abspath(os.path.join(versionedMainLibPath,u"nvdaHelperRemote.dll")),0,0x8)
 	if not h:
 		log.critical("Error loading nvdaHelperRemote.dll: %s" % WinError())
 		return
