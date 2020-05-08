@@ -450,7 +450,10 @@ user32.GetForegroundWindow.restype = ctypes.wintypes.HWND
 
 
 def getForegroundWindow():
-	return user32.GetForegroundWindow()
+	res = user32.GetForegroundWindow()
+	if not res:
+		return 0
+	return res
 
 
 
@@ -465,7 +468,11 @@ user32.GetDesktopWindow.restype = ctypes.wintypes.HWND
 
 
 def getDesktopWindow():
-	return user32.GetDesktopWindow()
+	res = user32.GetDesktopWindow()
+	if not res:
+		return 0
+	return res
+
 
 def getControlID(hwnd):
 	return user32.GetWindowLongW(hwnd,GWL_ID)
@@ -481,19 +488,27 @@ HWINEVENTHOOK=HANDLE
 
 WINEVENTPROC=WINFUNCTYPE(None,HWINEVENTHOOK,DWORD,HWND,c_long,c_long,DWORD,DWORD)
 
+
 def setWinEventHook(*args):
-		return user32.SetWinEventHook(*args)
+	return user32.SetWinEventHook(*args)
+
 
 def unhookWinEvent(*args):
 	return user32.UnhookWinEvent(*args)
 
+
 def sendMessage(hwnd,msg,param1,param2):
 	return user32.SendMessageW(hwnd,msg,param1,param2)
 
+
+user32.GetWindowThreadProcessId.restype = ctypes.wintypes.DWORD
+
+
 def getWindowThreadProcessID(hwnd):
 	processID = DWORD()
-	threadID=user32.GetWindowThreadProcessId(hwnd,byref(processID))
-	return (processID.value,threadID)
+	threadID = user32.GetWindowThreadProcessId(hwnd,byref(processID))
+	return (processID.value, threadID)
+
 
 def getClassName(window):
 	buf=create_unicode_buffer(256)
@@ -534,30 +549,50 @@ def getCaretPos():
 	user32.GetCaretPos(byref(point))
 	return [point.x,point.y]
 
+
+user32.GetTopWindow = ctypes.wintypes.HWND
+
+
 def getTopWindow(hwnd):
-	return user32.GetTopWindow(hwnd)
+	res = user32.GetTopWindow(hwnd)
+	if not res:
+		return 0
+	return res
+
 
 def getWindowText(hwnd):
 	buf=create_unicode_buffer(1024)
 	user32.InternalGetWindowText(hwnd,buf,1023)
 	return buf.value
 
-def getWindow(window,relation):
-	return user32.GetWindow(window,relation)
+
+user32.GetWindow.restype = ctypes.wintypes.HWND
+
+
+def getWindow(window, relation):
+	res = user32.GetWindow(window, relation)
+	if not res:
+		return 0
+	return res
+
 
 def isWindowVisible(window):
 	return bool(user32.IsWindowVisible(window))
 
+
 def isWindowEnabled(window):
 	return bool(user32.IsWindowEnabled(window))
+
 
 def getGUIThreadInfo(threadID):
 	info=GUITHREADINFO(cbSize=sizeof(GUITHREADINFO))
 	user32.GetGUIThreadInfo(threadID,byref(info))
 	return info
 
+
 def getWindowStyle(hwnd):
 	return user32.GetWindowLongW(hwnd,GWL_STYLE)
+
 
 def getExtendedWindowStyle(hwnd):
 	return user32.GetWindowLongW(hwnd,GWL_EXSTYLE)
@@ -573,9 +608,10 @@ def SetLayeredWindowAttributes(hwnd, key, alpha, flags):
 
 def getPreviousWindow(hwnd):
 	try:
-		return user32.GetWindow(hwnd,GW_HWNDPREV)
+		return getWindow(hwnd, GW_HWNDPREV)
 	except WindowsError:
 		return 0
+
 
 def getKeyboardLayout(idThread=0):
 	return user32.GetKeyboardLayout(idThread)
@@ -588,11 +624,16 @@ def getKeyNameText(scanCode,extended):
 	user32.GetKeyNameTextW((scanCode<<16)|(extended<<24),buf,31)
 	return buf.value
 
+
+user32.FindWindowW.restype = ctypes.wintypes.HWND
+
+
 def FindWindow(className, windowName):
 	res = user32.FindWindowW(className, windowName)
-	if res == 0:
+	if not res:
 		raise WinError()
 	return res
+
 
 MB_RETRYCANCEL=5
 MB_ICONERROR=0x10
@@ -600,17 +641,21 @@ MB_SYSTEMMODAL=0x1000
 IDRETRY=4
 IDCANCEL=3
 
+
 def MessageBox(hwnd, text, caption, type):
 	res = user32.MessageBoxW(hwnd, text, caption, type)
 	if res == 0:
 		raise WinError()
 	return res
 
+
 def PostMessage(hwnd, msg, wParam, lParam):
 	if not user32.PostMessageW(hwnd, msg, wParam, lParam):
 		raise WinError()
 
 user32.VkKeyScanExW.restype = SHORT
+
+
 def VkKeyScanEx(ch, hkl):
 	res = user32.VkKeyScanExW(WCHAR(ch), hkl)
 	if res == -1:

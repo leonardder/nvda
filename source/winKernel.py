@@ -50,11 +50,16 @@ WAIT_FAILED = 0xffffffff
 # Image file machine constants
 IMAGE_FILE_MACHINE_UNKNOWN = 0
 
+
+kernel32.GetStdHandle.restype = ctypes.wintypes.HANDLE
+
+
 def GetStdHandle(handleID):
-	h=kernel32.GetStdHandle(handleID)
-	if h==0:
+	h = kernel32.GetStdHandle(handleID)
+	if not h:
 		raise WinError()
 	return h
+
 
 GENERIC_READ=0x80000000
 GENERIC_WRITE=0x40000000
@@ -63,19 +68,35 @@ FILE_SHARE_WRITE=2
 FILE_SHARE_DELETE=4
 OPEN_EXISTING=3
 
+
+kernel32.CreateFileW.restype = ctypes.wintypes.HANDLE
+
+
 def CreateFile(fileName,desiredAccess,shareMode,securityAttributes,creationDisposition,flags,templateFile):
-	res=kernel32.CreateFileW(fileName,desiredAccess,shareMode,securityAttributes,creationDisposition,flags,templateFile)
-	if res==0:
+	res = kernel32.CreateFileW(fileName,desiredAccess,shareMode,securityAttributes,creationDisposition,flags,templateFile)
+	if not res:
 		raise ctypes.WinError()
 	return res
+
+
+kernel32.CreateEventW.restype = ctypes.wintypes.HANDLE
+
 
 def createEvent(eventAttributes=None, manualReset=False, initialState=False, name=None):
 	res = kernel32.CreateEventW(eventAttributes, manualReset, initialState, name)
-	if res==0:
+	if not res:
 		raise ctypes.WinError()
 	return res
 
-def createWaitableTimer(securityAttributes=None, manualReset=False, name=None):
+
+kernel32.CreateWaitableTimerW.restype = ctypes.wintypes.HANDLE
+
+
+def createWaitableTimer(
+		securityAttributes=None,
+		manualReset: bool = False,
+		name: Optional[str] = None
+):
 	"""Wrapper to the kernel32 CreateWaitableTimer function.
 	Consult https://msdn.microsoft.com/en-us/library/windows/desktop/ms682492.aspx for Microsoft's documentation.
 	In contrast with the original function, this wrapper assumes the following defaults.
@@ -85,14 +106,13 @@ def createWaitableTimer(securityAttributes=None, manualReset=False, name=None):
 	@type securityAttributes: pointer to L{SECURITY_ATTRIBUTES}
 	@param manualReset: Defaults to C{False} which means the timer is a synchronization timer.
 		If C{True}, the timer is a manual-reset notification timer.
-	@type manualReset: bool
 	@param name: Defaults to C{None}, the timer object is created without a name.
-	@type name: str
 	"""
 	res = kernel32.CreateWaitableTimerW(securityAttributes, manualReset, name)
-	if res==0:
+	if not res:
 		raise ctypes.WinError()
 	return res
+
 
 def setWaitableTimer(handle, dueTime, period=0, completionRoutine=None, arg=None, resume=False):
 	"""Wrapper to the kernel32 SETWaitableTimer function.
@@ -128,8 +148,12 @@ def setWaitableTimer(handle, dueTime, period=0, completionRoutine=None, arg=None
 	return True
 
 
+kernel32.OpenProcess.restype = ctypes.wintypes.HANDLE
+
+
 def openProcess(*args):
 	return kernel32.OpenProcess(*args)
+
 
 def closeHandle(*args):
 	return kernel32.CloseHandle(*args)
@@ -204,23 +228,32 @@ def GetTimeFormatEx(Locale,dwFlags,date,lpFormat):
 	kernel32.GetTimeFormatEx(Locale,dwFlags,lpTime,lpFormat, buf, bufferLength)
 	return buf.value
 
-def openProcess(*args):
-	return kernel32.OpenProcess(*args)
+
+kernel32.VirtualAllocEx.restype = ctypes.wintypes.LPVOID
+
 
 def virtualAllocEx(*args):
 	res = kernel32.VirtualAllocEx(*args)
-	if res == 0:
+	if not res:
 		raise WinError()
 	return res
+
 
 def virtualFreeEx(*args):
 	return kernel32.VirtualFreeEx(*args)
 
+
 def readProcessMemory(*args):
 	return kernel32.ReadProcessMemory(*args)
 
+
 def writeProcessMemory(*args):
 	return kernel32.WriteProcessMemory(*args)
+
+
+kernel32.WaitForSingleObject.restype = ctypes.wintypes.DWORD
+kernel32.WaitForSingleObject.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD)
+
 
 def waitForSingleObject(handle,timeout):
 	res = kernel32.WaitForSingleObject(handle,timeout)
@@ -228,11 +261,17 @@ def waitForSingleObject(handle,timeout):
 		raise ctypes.WinError()
 	return res
 
+
+kernel32.WaitForSingleObjectEx = ctypes.wintypes.DWORD
+kernel32.WaitForSingleObjectEx.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD, ctypes.wintypes.BOOL)
+
+
 def waitForSingleObjectEx(handle,timeout, alertable):
 	res = kernel32.WaitForSingleObjectEx(handle,timeout, alertable)
 	if res==WAIT_FAILED:
 		raise ctypes.WinError()
 	return res
+
 
 SHUTDOWN_NORETRY = 0x00000001
 
@@ -259,8 +298,13 @@ DRIVE_REMOTE = 4
 DRIVE_CDROM = 5
 DRIVE_RAMDISK = 6
 
+
+kernel32.GetDriveTypeW = ctypes.wintypes.UINT
+
+
 def GetDriveType(rootPathName):
 	return kernel32.GetDriveTypeW(rootPathName)
+
 
 class SECURITY_ATTRIBUTES(Structure):
 	_fields_ = (
@@ -315,8 +359,16 @@ def CreateProcessAsUser(token, applicationName, commandLine, processAttributes, 
 	if advapi32.CreateProcessAsUserW(token, applicationName, commandLine, processAttributes, threadAttributes, inheritHandles, creationFlags, environment, currentDirectory, byref(startupInfo), byref(processInformation)) == 0:
 		raise WinError()
 
+
+kernel32.GetCurrentProcess.restype = ctypes.wintypes.HANDLE
+
+
 def GetCurrentProcess():
 	return kernel32.GetCurrentProcess()
+
+
+advapi32.OpenProcessToken.argtypes = (ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD, ctypes.wintypes.PHANDLE)
+
 
 def OpenProcessToken(ProcessHandle, DesiredAccess):
 	token = HANDLE()
@@ -324,7 +376,20 @@ def OpenProcessToken(ProcessHandle, DesiredAccess):
 		raise WinError()
 	return token.value
 
+
 DUPLICATE_SAME_ACCESS = 0x00000002
+
+
+kernel32.DuplicateHandle.argtypes = (
+	ctypes.wintypes.HANDLE,
+	ctypes.wintypes.HANDLE,
+	ctypes.wintypes.HANDLE,
+	ctypes.wintypes.HANDLE,
+	ctypes.wintypes.DWORD,
+	ctypes.wintypes.BOOL,
+	ctypes.wintypes.DWORD, 
+)
+
 
 def DuplicateHandle(sourceProcessHandle, sourceHandle, targetProcessHandle, desiredAccess, inheritHandle, options):
 	targetHandle = HANDLE()
@@ -337,7 +402,11 @@ THREAD_SET_CONTEXT = 16
 
 GMEM_MOVEABLE=2
 
-class HGLOBAL(HANDLE):
+
+kernel32.GlobalAlloc.restype = ctypes.wintypes.HANDLE
+
+
+class HGLOBAL(ctypes.wintypes.HANDLE):
 	"""
 	A class for the HGLOBAL Windows handle type.
 	This class can auto-free the handle when it goes out of scope, 
@@ -387,6 +456,7 @@ class HGLOBAL(HANDLE):
 		Necessary if you pass this HGLOBAL to an API that takes ownership and therefore will handle freeing itself.
 		"""
 		self.value=None
+
 
 MOVEFILE_COPY_ALLOWED = 0x2
 MOVEFILE_CREATE_HARDLINK = 0x10
