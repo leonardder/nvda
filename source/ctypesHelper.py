@@ -10,6 +10,7 @@ from typing import Any, Callable, Union, Optional, get_type_hints
 from inspect import signature, _empty, Parameter
 from dataclasses import dataclass
 from logHandler import log
+from functools import update_wrapper
 
 
 class AnnotationError(ValueError):
@@ -78,5 +79,5 @@ def annotatedCFunction(
 		funcObj.errcheck = errCheckFactory()
 		funcObj.funcSpec = funcSpec
 		funcObj.paramFlags = paramFlags
-		return funcObj
+		return update_wrapper(funcObj, func)
 	return wrap
