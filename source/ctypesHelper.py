@@ -20,18 +20,35 @@ class AnnotationError(ValueError):
 @dataclass
 class OutParam:
 	"""Type to specify C style functions output parameters."""
-	default = _empty
+	default: Any = _empty
 
 
 def errCheckFactory(
 		*,
-		isErrorCallable: Callable[[Any], bool] = lambda res: res in (None, 0),
-		discardReturn: bool = True
+		errorCallable: Callable[[Any], bool],
+		discardReturnValue: bool
 ):
 	def _errCheck(result, func, args):
-		if isErrorCallable(result):
-			raise ctypes.WinError()
-		return args
+		if errorCallable(result):
+			raise ctypes.WinError(ctypes.set_last_error(0))
+		if discardReturnValue:
+			result = None
+			# when returning args, ctypes will return the output arguments if any, or the result, which we set to None.
+			return args
+		if result is None and issubclass(func.restype, ctypes.c_void_p):
+			# ctypes returns None for a null pointer, yet we return 0 because:
+			# * discardReturnValue is False
+			# * NVDA expects 0 instead of None for most NULL handles
+			result = 0
+		# Filter the arguments for the out params, if any, since we might want to return them
+		outArgs = tuple(
+			arg for arg, direction
+			in zip(args, (f[0] for f in func.paramFlags))
+			if direction == 2
+		)
+		if not outArgs:
+			return result
+		return (result, ) + outArgs
 	return _errCheck
 
 
@@ -40,9 +57,10 @@ def annotatedCFunction(
 		nameOrOrdinal: Optional[Union[str, int]] = None,
 		typeFactory: Callable = ctypes.WINFUNCTYPE,
 		*,
-		useLastError=False
+		useLastError=False,
+		errorCallable: Callable[[Any], bool] = lambda res: res in (None, 0),
+		discardReturnValue: bool = False
 ):
-
 	def wrap(func):
 		if not get_type_hints(func):
 			raise AnnotationError(f"{func.__qualname__} stub has no annotations")
@@ -76,8 +94,11 @@ def annotatedCFunction(
 				paramFlags.append((direction, name, default))
 		paramFlags = tuple(paramFlags)
 		funcObj = funcType(funcSpec, paramFlags)
-		funcObj.errcheck = errCheckFactory()
 		funcObj.funcSpec = funcSpec
 		funcObj.paramFlags = paramFlags
+		funcObj.errcheck = errCheckFactory(
+			errorCallable=errorCallable,
+			discardReturnValue=discardReturnValue
+		)
 		return update_wrapper(funcObj, func)
 	return wrap
