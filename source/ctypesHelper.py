@@ -14,16 +14,28 @@ from functools import wraps
 
 
 class AnnotationError(ValueError):
+	"""Raised by L{annotatedCFunction} when one or more type hints are missing or incorrect.
+	"""
 	...
 
 
 @dataclass
 class OutParam:
-	"""Type to specify C style functions output parameters."""
+	"""
+	Type to specify C style functions output parameters.
+	Instances can be used as default values when decorating functions with L{annotatedCFunction}.
+	See documentation of L{annotatedCFunction} for examples.
+	"""
+	#: The real default value for the output parameter.
 	default: Any = _empty
 
 
-def parameterToParamFlagsTuple(param):
+def parameterToParamFlagsTuple(param: Parameter) -> Tuple:
+	"""Converts a L{Parameter} to a ctypes paramflags tuple.
+	Any parameter with a defaultvalue of type L{OutParam} will be treated as an output parameter.
+	Any other parameters will be treated as input parameter.
+	See https://docs.python.org/3/library/ctypes.html#function-prototypes for documentation about paramFlags.
+	"""
 	isOutParam = isinstance(param.default, OutParam)
 	direction = 2 if isOutParam else 1
 	name = param.name
@@ -40,6 +52,13 @@ def errCheckFactory(
 		errRaiseCallable: Callable[[], Exception],
 		discardReturnValue: bool
 ):
+	"""
+	Factory to create an error checking function used by L{annotatedCFunction}.
+	See https://docs.python.org/3/library/ctypes.html#ctypes._FuncPtr.errcheck for information about
+	what ctypes expects from such a function.
+	See L{annotatedCFunction} for more information about this factory's parameters.
+	"""
+
 	def _errCheck(result, func, args):
 		if not discardReturnValue and result is None and issubclass(func.restype, ctypes.c_void_p):
 			# ctypes returns None for a null pointer, yet we return 0 because:
