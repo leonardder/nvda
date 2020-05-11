@@ -6,11 +6,11 @@
 """Helper functions for external library interop with ctypes."""
 
 import ctypes
-from typing import Any, Callable, Union, Optional, get_type_hints
+from typing import Any, Callable, Union, Optional, Tuple,get_type_hints
 from inspect import signature, _empty, Parameter
 from dataclasses import dataclass
 from logHandler import log
-from functools import update_wrapper
+from functools import wraps
 
 
 class AnnotationError(ValueError):
@@ -24,6 +24,7 @@ class OutParam:
 
 
 def errCheckFactory(
+		paramFlags: Tuple[Tuple],
 		*,
 		errCheckCallable: Optional[Callable[[Any], bool]],
 		errRaiseCallable: Callable[[], Exception],
@@ -44,7 +45,7 @@ def errCheckFactory(
 		# Filter the arguments for the out params, if any, since we might want to return them
 		outArgs = tuple(
 			arg for arg, direction
-			in zip(args, (f[0] for f in func.paramFlags))
+			in zip(args, (f[0] for f in paramFlags))
 			if direction == 2
 		)
 		if not outArgs:
@@ -95,12 +96,18 @@ def annotatedCFunction(
 				paramFlags.append((direction, name, default))
 		paramFlags = tuple(paramFlags)
 		funcObj = funcType(funcSpec, paramFlags)
-		funcObj.funcSpec = funcSpec
-		funcObj.paramFlags = paramFlags
 		funcObj.errcheck = errCheckFactory(
+			paramFlags,
 			errCheckCallable=errCheckCallable,
 			errRaiseCallable=errRaiseCallable,
 			discardReturnValue=discardReturnValue
 		)
-		return update_wrapper(funcObj, func)
+
+		@wraps(func)
+		def wrapper(*args, **kwargs):
+			return funcObj(*args, **kwargs)
+
+		wrapper.funcSpec = funcSpec
+		wrapper.paramFlags = paramFlags
+		return wrapper
 	return wrap
