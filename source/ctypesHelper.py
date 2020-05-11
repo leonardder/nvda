@@ -25,21 +25,22 @@ class OutParam:
 
 def errCheckFactory(
 		*,
-		errorCallable: Callable[[Any], bool],
+		errCheckCallable: Optional[Callable[[Any], bool]],
+		errRaiseCallable: Callable[[], Exception],
 		discardReturnValue: bool
 ):
 	def _errCheck(result, func, args):
-		if errorCallable(result):
-			raise ctypes.WinError(ctypes.set_last_error(0))
-		if discardReturnValue:
-			result = None
-			# when returning args, ctypes will return the output arguments if any, or the result, which we set to None.
-			return args
-		if result is None and issubclass(func.restype, ctypes.c_void_p):
+		if not discardReturnValue and result is None and issubclass(func.restype, ctypes.c_void_p):
 			# ctypes returns None for a null pointer, yet we return 0 because:
 			# * discardReturnValue is False
 			# * NVDA expects 0 instead of None for most NULL handles
 			result = 0
+		if errCheckCallable is not None and errCheckCallable(result):
+			raise errRaiseCallable()
+		if discardReturnValue:
+			result = None
+			# when returning args, ctypes will return the output arguments if any, or the result, which we set to None.
+			return args
 		# Filter the arguments for the out params, if any, since we might want to return them
 		outArgs = tuple(
 			arg for arg, direction
@@ -57,8 +58,8 @@ def annotatedCFunction(
 		nameOrOrdinal: Optional[Union[str, int]] = None,
 		typeFactory: Callable = ctypes.WINFUNCTYPE,
 		*,
-		useLastError=False,
-		errorCallable: Callable[[Any], bool] = lambda res: res in (None, 0),
+		errCheckCallable: Optional[Callable[[Any], bool]] = lambda res: res in (None, 0),
+		errRaiseCallable: Callable[[], Exception] = ctypes.WinError,
 		discardReturnValue: bool = False
 ):
 	def wrap(func):
@@ -80,7 +81,7 @@ def annotatedCFunction(
 			)
 		resType = sig.return_annotation
 		argTypes = tuple(param.annotation for param in sig.parameters.values())
-		funcType = typeFactory(resType, *argTypes, use_last_error=useLastError)
+		funcType = typeFactory(resType, *argTypes)
 		funcSpec = (nameOrOrdinal or func.__name__, library)
 		paramFlags = []
 		for param in sig.parameters.values():
@@ -97,7 +98,8 @@ def annotatedCFunction(
 		funcObj.funcSpec = funcSpec
 		funcObj.paramFlags = paramFlags
 		funcObj.errcheck = errCheckFactory(
-			errorCallable=errorCallable,
+			errCheckCallable=errCheckCallable,
+			errRaiseCallable=errRaiseCallable,
 			discardReturnValue=discardReturnValue
 		)
 		return update_wrapper(funcObj, func)

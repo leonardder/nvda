@@ -12,6 +12,7 @@ import ctypes.wintypes
 from ctypes import WinError
 from ctypes import *
 from ctypes.wintypes import *
+from ctypesHelper import OutParam, annotatedCFunction
 
 kernel32=ctypes.windll.kernel32
 advapi32 = windll.advapi32
@@ -49,11 +50,7 @@ WAIT_FAILED = 0xffffffff
 # Image file machine constants
 IMAGE_FILE_MACHINE_UNKNOWN = 0
 
-def GetStdHandle(handleID):
-	h=kernel32.GetStdHandle(handleID)
-	if h==0:
-		raise WinError()
-	return h
+INVALID_HANDLE_VALUE = 0xffffffff
 
 GENERIC_READ=0x80000000
 GENERIC_WRITE=0x40000000
@@ -61,6 +58,18 @@ FILE_SHARE_READ=1
 FILE_SHARE_WRITE=2
 FILE_SHARE_DELETE=4
 OPEN_EXISTING=3
+
+
+class SECURITY_ATTRIBUTES(Structure):
+	_fields_ = (
+		("nLength", ctypes.wintypes.DWORD),
+		("lpSecurityDescriptor", ctypes.wintypes.LPVOID),
+		("bInheritHandle", ctypes.wintypes.BOOL)
+	)
+
+	def __init__(self, **kwargs):
+		super().__init__(nLength=sizeof(self), **kwargs)
+
 
 def CreateFile(fileName,desiredAccess,shareMode,securityAttributes,creationDisposition,flags,templateFile):
 	res=kernel32.CreateFileW(fileName,desiredAccess,shareMode,securityAttributes,creationDisposition,flags,templateFile)
@@ -74,24 +83,26 @@ def createEvent(eventAttributes=None, manualReset=False, initialState=False, nam
 		raise ctypes.WinError()
 	return res
 
-def createWaitableTimer(securityAttributes=None, manualReset=False, name=None):
+
+
+@annotatedCFunction(kernel32, "CreateWaitableTimerW", errCheckCallable=lambda h: h == 0)
+def createWaitableTimer(
+		securityAttributes: ctypes.POINTER(SECURITY_ATTRIBUTES) = None,
+		manualReset: ctypes.wintypes.BOOL = False,
+		name: ctypes.wintypes.LPCWSTR = None
+) -> ctypes.wintypes.HANDLE:
 	"""Wrapper to the kernel32 CreateWaitableTimer function.
 	Consult https://msdn.microsoft.com/en-us/library/windows/desktop/ms682492.aspx for Microsoft's documentation.
 	In contrast with the original function, this wrapper assumes the following defaults.
 	@param securityAttributes: Defaults to C{None};
 		The timer object gets a default security descriptor and the handle cannot be inherited.
 		The ACLs in the default security descriptor for a timer come from the primary or impersonation token of the creator.
-	@type securityAttributes: pointer to L{SECURITY_ATTRIBUTES}
 	@param manualReset: Defaults to C{False} which means the timer is a synchronization timer.
 		If C{True}, the timer is a manual-reset notification timer.
-	@type manualReset: bool
 	@param name: Defaults to C{None}, the timer object is created without a name.
-	@type name: str
 	"""
-	res = kernel32.CreateWaitableTimerW(securityAttributes, manualReset, name)
-	if res==0:
-		raise ctypes.WinError()
-	return res
+	...
+
 
 def setWaitableTimer(handle, dueTime, period=0, completionRoutine=None, arg=None, resume=False):
 	"""Wrapper to the kernel32 SETWaitableTimer function.
@@ -260,15 +271,6 @@ DRIVE_RAMDISK = 6
 
 def GetDriveType(rootPathName):
 	return kernel32.GetDriveTypeW(rootPathName)
-
-class SECURITY_ATTRIBUTES(Structure):
-	_fields_ = (
-		("nLength", DWORD),
-		("lpSecurityDescriptor", LPVOID),
-		("bInheritHandle", BOOL)
-	)
-	def __init__(self, **kwargs):
-		super(SECURITY_ATTRIBUTES, self).__init__(nLength=sizeof(self), **kwargs)
 
 def CreatePipe(pipeAttributes, size):
 	read = ctypes.wintypes.HANDLE()
