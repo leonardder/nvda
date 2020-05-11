@@ -71,18 +71,27 @@ class SECURITY_ATTRIBUTES(Structure):
 		super().__init__(nLength=sizeof(self), **kwargs)
 
 
-def CreateFile(fileName,desiredAccess,shareMode,securityAttributes,creationDisposition,flags,templateFile):
-	res=kernel32.CreateFileW(fileName,desiredAccess,shareMode,securityAttributes,creationDisposition,flags,templateFile)
-	if res==0:
-		raise ctypes.WinError()
-	return res
+@annotatedCFunction(kernel32, "CreateFileW", errCheckCallable=lambda h: h == 0)
+def CreateFile(
+		fileName: ctypes.wintypes.LPCWSTR,
+		desiredAccess: ctypes.wintypes.DWORD,
+		shareMode: ctypes.wintypes.DWORD,
+		securityAttributes: ctypes.POINTER(SECURITY_ATTRIBUTES),
+		creationDisposition: ctypes.wintypes.DWORD,
+		flags: ctypes.wintypes.DWORD,
+		templateFile: ctypes.wintypes.HANDLE
+) -> ctypes.wintypes.HANDLE:
+	...
 
-def createEvent(eventAttributes=None, manualReset=False, initialState=False, name=None):
-	res = kernel32.CreateEventW(eventAttributes, manualReset, initialState, name)
-	if res==0:
-		raise ctypes.WinError()
-	return res
 
+@annotatedCFunction(kernel32, "CreateEventW", errCheckCallable=lambda h: h == 0)
+def createEvent(
+		eventAttributes: ctypes.POINTER(SECURITY_ATTRIBUTES) = None,
+		manualReset: ctypes.wintypes.BOOL = False,
+		initialState: ctypes.wintypes.BOOL = False,
+		name: ctypes.wintypes.LPCWSTR = None
+) -> ctypes.wintypes.HANDLE:
+	...
 
 
 @annotatedCFunction(kernel32, "CreateWaitableTimerW", errCheckCallable=lambda h: h == 0)
