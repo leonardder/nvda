@@ -23,6 +23,16 @@ class OutParam:
 	default: Any = _empty
 
 
+def parameterToParamFlagsTuple(param):
+	isOutParam = isinstance(param.default, OutParam)
+	direction = 2 if isOutParam else 1
+	name = param.name
+	default = param.default.default if isOutParam else param.default
+	if default is _empty:
+		return (direction, name)
+	return (direction, name, default)
+
+
 def errCheckFactory(
 		paramFlags: Tuple[Tuple],
 		*,
@@ -84,17 +94,7 @@ def annotatedCFunction(
 		argTypes = tuple(param.annotation for param in sig.parameters.values())
 		funcType = typeFactory(resType, *argTypes)
 		funcSpec = (nameOrOrdinal or func.__name__, library)
-		paramFlags = []
-		for param in sig.parameters.values():
-			isOutParam = isinstance(param.default, OutParam)
-			direction = 2 if isOutParam else 1
-			name = param.name
-			default = param.default.default if isOutParam else param.default
-			if default is _empty:
-				paramFlags.append((direction, name))
-			else:
-				paramFlags.append((direction, name, default))
-		paramFlags = tuple(paramFlags)
+		paramFlags = tuple(parameterToParamFlagsTuple(param) for param in sig.parameters.values())
 		funcObj = funcType(funcSpec, paramFlags)
 		funcObj.errcheck = errCheckFactory(
 			paramFlags,
