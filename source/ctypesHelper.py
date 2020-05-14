@@ -6,8 +6,17 @@
 """Helper functions for external library interop with ctypes."""
 
 import ctypes
-from typing import Any, Callable, Union, Optional, Tuple,get_type_hints
-from inspect import signature, Signature, _empty, Parameter
+from typing import (
+	Any,
+	Callable,
+	Union,
+	Optional,
+	Tuple,
+	get_type_hints,
+	Generic,
+	TypeVar
+)
+from inspect import signature, Signature, Parameter
 from dataclasses import dataclass
 from logHandler import log
 from functools import wraps
@@ -18,16 +27,17 @@ class AnnotationError(ValueError):
 	"""
 	...
 
+CType = TypeVar("CType")
 
 @dataclass
-class OutParam:
+class OutParam(Generic[CType]):
 	"""
 	Type to specify C style functions output parameters.
 	Instances can be used as default values when decorating functions with L{annotatedCFunction}.
 	See documentation of L{annotatedCFunction} for examples.
 	"""
 	#: The real default value for the output parameter.
-	default: Any = _empty
+	default: CType = Parameter.empty
 
 
 def signatureToFuncType(
@@ -38,11 +48,11 @@ def signatureToFuncType(
 	@param sig: The signature.
 	@param funcTypeFactory: One of ctypes.CFUNCTYPE, ctypes.WINFUNCTYPE or ctypes.PYFUNCTYPE.
 	"""
-	if sig.return_annotation is _empty:
+	if sig.return_annotation is Parameter.empty:
 		raise AnnotationError(f"Signature {sig} has no return annotation")
 	emptyAnnotations = [
 		name for name, param in sig.parameters.items()
-		if param.annotation is _empty
+		if param.annotation is Parameter.empty
 	]
 	if emptyAnnotations:
 		emptyAnnotationsStr = ", ".join(emptyAnnotations)
@@ -69,7 +79,7 @@ def _parameterToParamFlag(param: Parameter) -> Tuple:
 	direction = 2 if isOutParam else 1
 	name = param.name
 	default = param.default.default if isOutParam else param.default
-	if default is _empty:
+	if default is Parameter.empty:
 		return (direction, name)
 	return (direction, name, default)
 
