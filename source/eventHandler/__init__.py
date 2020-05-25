@@ -289,7 +289,11 @@ def shouldAcceptEvent(
 		"gainFocus", "foreground",
 		"menuStart", "alert",
 		# We need valueChange events for progress bars.
-		"valueChange"
+		"valueChange",
+		# We need UIA selection events for search results.
+		"UIA_elementSelected",
+		# Live regions
+		"liveRegionChange",
 	):
 		# We only care about most events if they are for specific objects the user
 		# is interested in.
