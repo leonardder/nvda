@@ -42,6 +42,8 @@ import braille
 import locationHelper
 import ui
 import winVersion
+from eventHandler.eventParams import UIAEventParams
+
 
 class UIATextInfo(textInfos.TextInfo):
 
@@ -1590,6 +1592,16 @@ class UIA(Window):
 				# Note that no distinction is made between important and non-important.
 				speech.cancelSpeech()
 			ui.message(displayString)
+
+	def matchAPIEvent(self, params):
+		if not isinstance(params, UIAEventParams):
+			return super().matchAPIEvent(params)
+		try:
+			return UIAHandler.handler.clientObject.CompareElements(params.UIAElement, self.UIAElement)
+		except COMError:
+			log.exception()
+			return False
+
 
 class TreeviewItem(UIA):
 

@@ -36,6 +36,8 @@ import NVDAObjects.JAB
 import eventHandler
 from NVDAObjects.behaviors import ProgressBar, Dialog, EditableTextWithAutoSelectDetection, FocusableUnfocusableContainer, ToolTip, Notification
 from locationHelper import RectLTWH
+from eventHandler.eventParams import WinEventParams
+
 
 def getNVDAObjectFromEvent(hwnd,objectID,childID):
 	try:
@@ -1644,10 +1646,12 @@ the NVDAObject for IAccessible
 			return False
 
 	def matchAPIEvent(self, params):
+		if not isinstance(params, WinEventParams):
+			return super().matchAPIEvent(params)
 		return (
-			params.get("windowHandle") == self.windowHandle and
-			params.get("objectID") == self.event_objectID and
-			params.get("childID") == self.event_childID
+			params.windowHandle == self.windowHandle
+			and params.objectId == self.event_objectID
+			and params.childId == self.event_childID
 		)
 
 

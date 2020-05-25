@@ -14,7 +14,7 @@ from typing import Dict, Callable
 import core
 import winUser
 import eventHandler
-
+from eventHandler.eventParams import WinEventParams
 from comInterfaces.IAccessible2Lib import (
 	IA2_EVENT_TEXT_CARET_MOVED,
 	IA2_EVENT_DOCUMENT_LOAD_COMPLETE,
@@ -158,9 +158,11 @@ def winEventCallback(handle, eventID, window, objectID, childID, threadID, times
 			not eventHandler.shouldAcceptEvent(
 				winEventIDsToNVDAEventNames[eventID],
 				windowHandle=window,
-				apiEventParams={
-					"windowHandle": window, "objectID": objectID, "childID": childID
-				}
+				apiEventParams=WinEventParams(
+					windowHandle=window,
+					objectId=objectID,
+					childId=childID
+				)
 			)
 		):
 			return

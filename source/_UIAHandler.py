@@ -30,6 +30,8 @@ from comtypes.gen import UIAutomationClient as UIA
 from comtypes.gen.UIAutomationClient import *
 import textInfos
 from typing import Dict
+from eventHandler.eventParams import UIAEventParams
+
 
 #Some newer UIA constants that could be missing
 ItemIndex_Property_GUID=GUID("{92A053DA-2969-4021-BF27-514CFC2E4A69}")
@@ -321,7 +323,14 @@ class UIAHandler(COMObject):
 				)
 			return
 		window = self.getNearestWindowHandle(sender)
-		if window and not eventHandler.shouldAcceptEvent(NVDAEventName, windowHandle=window):
+		if window and not eventHandler.shouldAcceptEvent(
+			NVDAEventName,
+			windowHandle=window,
+				apiEventParams=UIAEventParams(
+				windowHandle=window,
+				UIAElement=sender
+			)
+		):
 			if _isDebug():
 				log.debug(
 					f"HandleAutomationEvent: Ignoring event {NVDAEventName} for shouldAcceptEvent=False"
@@ -387,7 +396,14 @@ class UIAHandler(COMObject):
 						exc_info=True
 					)
 		window = self.getNearestWindowHandle(sender)
-		if window and not eventHandler.shouldAcceptEvent("gainFocus", windowHandle=window):
+		if window and not eventHandler.shouldAcceptEvent(
+			"gainFocus",
+			windowHandle=window,
+			apiEventParams=UIAEventParams(
+				windowHandle=window,
+				UIAElement=sender
+			)
+		):
 			if _isDebug():
 				log.debug("HandleFocusChangedEvent: Ignoring for shouldAcceptEvent=False")
 			return
@@ -444,7 +460,16 @@ class UIAHandler(COMObject):
 				)
 			return
 		window = self.getNearestWindowHandle(sender)
-		if window and not eventHandler.shouldAcceptEvent(NVDAEventName, windowHandle=window):
+		if window and not eventHandler.shouldAcceptEvent(
+			NVDAEventName,
+			windowHandle=window,
+			apiEventParams=UIAEventParams(
+				windowHandle=window,
+				UIAElement=sender,
+				propertyId=propertyId,
+				newValue=newValue
+			)
+		):
 			if _isDebug():
 				log.debug(
 					f"HandlePropertyChangedEvent: Ignoring event {NVDAEventName} for shouldAcceptEvent=False"
