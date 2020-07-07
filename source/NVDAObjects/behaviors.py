@@ -169,10 +169,10 @@ class EditableText(editableText.EditableText, NVDAObject):
 			self.bindGesture("kb:enter","caret_newLine")
 			self.bindGesture("kb:numpadEnter","caret_newLine")
 
-	def _caretScriptPostMovedHelper(self, speakUnit, gesture, info=None):
+	def _caretScriptPostMovedHelper(self, speakUnit, gesture, info=None, caretMoved=True):
 		if eventHandler.isPendingEvents("gainFocus"):
 			return
-		super()._caretScriptPostMovedHelper(speakUnit, gesture, info)
+		super()._caretScriptPostMovedHelper(speakUnit, gesture, info, caretMoved)
 
 class EditableTextWithAutoSelectDetection(EditableText):
 	"""In addition to L{EditableText}, handles reporting of selection changes for objects which notify of them.

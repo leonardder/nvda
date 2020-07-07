@@ -87,6 +87,7 @@ class EditableText(TextContainerObject,ScriptableObject):
 			if eventHandler.isPendingEvents("gainFocus"):
 				log.debug("Focus event. Elapsed: %d ms" % elapsed)
 				return (True,None)
+			caretEventFired = False
 			# If the focus changes after this point, fetching the caret may fail,
 			# but we still want to stay in this loop.
 			try:
@@ -104,7 +105,7 @@ class EditableText(TextContainerObject,ScriptableObject):
 					(eventHandler.isPendingEvents("caret") or eventHandler.isPendingEvents("textChange"))
 				):
 					log.debug("Caret move detected using event. Elapsed: %d ms" % elapsed)
-					return (True,newInfo)
+					caretEventFired = True
 			# Try to detect with bookmarks.
 			newBookmark = None
 			if newInfo:
@@ -115,6 +116,16 @@ class EditableText(TextContainerObject,ScriptableObject):
 			if newBookmark and newBookmark!=bookmark:
 				log.debug("Caret move detected using bookmarks. Elapsed: %d ms" % elapsed)
 				return (True, newInfo)
+			elif caretEventFired:
+				if not newBookmark:
+					log.debug("NO bookmark, relying on caret event")
+					return (True, newInfo)
+				elif newBookmark == bookmark:
+					log.debug(
+						"Caret move event received, but bookmark at same position, "
+						"probably edge of document"
+					)
+					return (False, newInfo)
 			if origWord is not None and newInfo and elapsed >= self._hasCaretMoved_minWordTimeoutMs:
 				# When pressing delete, bookmarks might not be enough to detect caret movement.
 				# Therefore try detecting if the word under the caret has changed, such as when pressing delete.
@@ -133,7 +144,7 @@ class EditableText(TextContainerObject,ScriptableObject):
 		log.debug("Caret didn't move before timeout. Elapsed: %d ms" % elapsed)
 		return (False,newInfo)
 
-	def _caretScriptPostMovedHelper(self, speakUnit, gesture, info=None):
+	def _caretScriptPostMovedHelper(self, speakUnit, gesture, info=None, caretMoved=True):
 		if isScriptWaiting():
 			return
 		if not info:
@@ -145,8 +156,11 @@ class EditableText(TextContainerObject,ScriptableObject):
 		speech.clearTypedWordBuffer()
 		review.handleCaretMove(info)
 		if speakUnit and not willSayAllResume(gesture):
+			prefixSpeechCommand = None
+			if not caretMoved:
+				prefixSpeechCommand = speech.commands.BeepCommand(330, 5)
 			info.expand(speakUnit)
-			speech.speakTextInfo(info, unit=speakUnit, reason=controlTypes.REASON_CARET)
+			speech.speakTextInfo(info, unit=speakUnit, reason=controlTypes.REASON_CARET, _prefixSpeechCommand=prefixSpeechCommand)
 		braille.handler.handleCaretMove(self)
 
 	def _caretMovementScriptHelper(self, gesture, unit):
@@ -160,7 +174,7 @@ class EditableText(TextContainerObject,ScriptableObject):
 		caretMoved,newInfo=self._hasCaretMoved(bookmark) 
 		if not caretMoved and self.shouldFireCaretMovementFailedEvents:
 			eventHandler.executeEvent("caretMovementFailed", self, gesture=gesture)
-		self._caretScriptPostMovedHelper(unit,gesture,newInfo)
+		self._caretScriptPostMovedHelper(unit, gesture, newInfo, caretMoved=caretMoved)
 
 	def _get_caretMovementDetectionUsesEvents(self) -> bool:
 		"""Returns whether or not to rely on caret and textChange events when
