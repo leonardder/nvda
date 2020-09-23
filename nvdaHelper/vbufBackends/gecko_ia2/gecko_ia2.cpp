@@ -675,6 +675,7 @@ VBufStorage_fieldNode_t* GeckoVBufBackend_t::fillVBuf(
 		parentNode->addAttribute(L"alwaysReportName",L"true");
 	}
 
+	CComQIPtr<IAccessible2_2> pacc2_2=pacc;
 	if(pacc2_2) {
 		// Add information about controllerFor and controlledBy targets for aria-controls.
 		fillRelationTargetInfo(parentNode, pacc2_2, IA2_RELATION_CONTROLLER_FOR);
