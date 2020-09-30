@@ -97,9 +97,12 @@ class Gecko_ia2_TextInfo(VirtualBufferTextInfo):
 
 		xmlRoles=attrs.get("IAccessible2::attribute_xml-roles", "").split(" ")
 		landmark = next((xr for xr in xmlRoles if xr in aria.landmarkRoles), None)
-		if landmark and role != controlTypes.ROLE_LANDMARK and landmark != xmlRoles[0]:
-			# Ignore the landmark role
-			landmark = None
+		if landmark:
+			if landmark != xmlRoles[0]:
+				# Ignore the landmark role
+				landmark = None
+			elif role != controlTypes.ROLE_LANDMARK:
+				role = controlTypes.ROLE_LANDMARK
 		if role == controlTypes.ROLE_DOCUMENT and xmlRoles[0] == "article":
 			role = controlTypes.ROLE_ARTICLE
 		elif role == controlTypes.ROLE_GROUPING and xmlRoles[0] == "figure":
